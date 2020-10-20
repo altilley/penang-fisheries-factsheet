@@ -1,4 +1,4 @@
-FROM rocker/geospatial:4.0.2
+FROM rocker/geospatial:4.0.3
 
 # Extra R packages
 RUN install2.r drake here janitor skimr
