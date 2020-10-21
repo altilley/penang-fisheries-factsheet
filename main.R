@@ -21,7 +21,15 @@ get_data <- drake_plan(
       object_name = raw_data_object_uri,
       saveToDisk = file_out("data/raw/penang-fisheries-landings.xlsx"),
       overwrite = TRUE)),
-
+  landings = readxl::read_excel(
+    path = file_in("data/raw/penang-fisheries-landings.xlsx"),
+    sheet = "landings"),
+  species = readxl::read_excel(
+    path = file_in("data/raw/penang-fisheries-landings.xlsx"),
+    sheet = "species"),
+  prices = readxl::read_excel(
+    path = file_in("data/raw/penang-fisheries-landings.xlsx"),
+    sheet = "pvt_catch kg"),
 )
 
 full_plan <- rbind(get_data)
