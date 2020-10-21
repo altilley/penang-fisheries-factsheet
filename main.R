@@ -32,6 +32,11 @@ get_data <- drake_plan(
     sheet = "pvt_catch kg"),
 )
 
+clean_data <- drake_plan(
+  landings_clean = clean_landings(landings),
+  species_clean = clean_species(species),
+)
+
 test_plan <- drake_plan(
   trip_id_tests = test_trip_id(landings),
   # rec_id_tests = test_rec_id(landings),
