@@ -8,7 +8,7 @@ clean_landings <- function(landings){
                     condition = imei == 0,
                     true = NA_integer_,
                     false = imei)) %>%
-    dplyr::mutate(species = tolower(species)) %>%
+    dplyr::mutate(common_malay = tolower(common_malay)) %>%
     dplyr::rename(weight_kg = kg,
                   total_price = total_revenue)
 }
@@ -16,7 +16,5 @@ clean_landings <- function(landings){
 # Clean the species data frame
 clean_species <- function(species){
   species %>%
-    dplyr::mutate(species = common_malay,
-                  species = tolower(species)) %>%
-    dplyr::select(-id)
+    dplyr::mutate(common_malay = tolower(common_malay))
 }

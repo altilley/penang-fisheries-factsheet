@@ -13,7 +13,7 @@ trip_summary <- landings_clean %>%
     fisher = dplyr::first(fisher), 
     total_price = sum(total_price), 
     weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(species))
+    n_species = dplyr::n_distinct(common_malay))
 
 fisher_summary <- landings_clean %>%
   dplyr::group_by(fisher) %>%
@@ -23,10 +23,10 @@ fisher_summary <- landings_clean %>%
     last_trip = max(date),
     total_price = sum(total_price), 
     weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(species))
+    n_species = dplyr::n_distinct(common_malay))
 ```
 
-Between 01 September 2019 and 19 September 2020 we recorded 188 trips by
+Between 01 September 2019 and 19 September 2020 we recorded 187 trips by
 35 fishers. During this time, GPS trackers were installed in 3 boats.
 
 ``` r
@@ -54,7 +54,7 @@ fisher_summary %>%
 ``` r
 species_summary <- landings_clean %>%
   dplyr::filter(!is.na(price_kg)) %>%
-  dplyr::mutate(species = forcats::fct_lump_n(species, w = price_kg*weight_kg, n = 20)) %>%
+  dplyr::mutate(species = forcats::fct_lump_n(common_malay, w = price_kg*weight_kg, n = 20)) %>%
   dplyr::group_by(species) %>%
   dplyr::summarise(
     frequency = dplyr::n_distinct(trip_id), 
@@ -106,7 +106,5 @@ trip_summary %>%
   ggplot(aes(x = date, y = total_price)) +
   geom_point(aes(colour = fisher))
 ```
-
-    ## Warning: Removed 1 rows containing missing values (geom_point).
 
 ![](README_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->

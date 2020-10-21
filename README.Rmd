@@ -22,7 +22,7 @@ trip_summary <- landings_clean %>%
     fisher = dplyr::first(fisher), 
     total_price = sum(total_price), 
     weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(species))
+    n_species = dplyr::n_distinct(common_malay))
 
 fisher_summary <- landings_clean %>%
   dplyr::group_by(fisher) %>%
@@ -32,10 +32,7 @@ fisher_summary <- landings_clean %>%
     last_trip = max(date),
     total_price = sum(total_price), 
     weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(species))
-
-
-
+    n_species = dplyr::n_distinct(common_malay))
 ```
 
 Between `r format(min(trip_summary$date), "%d %B %Y")` and `r format(max(trip_summary$date), "%d %B %Y")` we recorded `r nrow(trip_summary)` trips by `r dplyr::n_distinct(landings_clean$fisher)` fishers. During this time, GPS trackers were installed in `r length(na.omit(fisher_summary$imei))` boats. 
@@ -61,7 +58,7 @@ fisher_summary %>%
 ```{r}
 species_summary <- landings_clean %>%
   dplyr::filter(!is.na(price_kg)) %>%
-  dplyr::mutate(species = forcats::fct_lump_n(species, w = price_kg*weight_kg, n = 20)) %>%
+  dplyr::mutate(species = forcats::fct_lump_n(common_malay, w = price_kg*weight_kg, n = 20)) %>%
   dplyr::group_by(species) %>%
   dplyr::summarise(
     frequency = dplyr::n_distinct(trip_id), 

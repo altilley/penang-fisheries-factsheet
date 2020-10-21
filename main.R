@@ -23,13 +23,10 @@ get_data <- drake_plan(
       overwrite = TRUE)),
   landings = readxl::read_excel(
     path = file_in("data/raw/penang-fisheries-landings.xlsx"),
-    sheet = "landings"),
+    sheet = "catch"),
   species = readxl::read_excel(
     path = file_in("data/raw/penang-fisheries-landings.xlsx"),
-    sheet = "species"),
-  prices = readxl::read_excel(
-    path = file_in("data/raw/penang-fisheries-landings.xlsx"),
-    sheet = "pvt_catch kg"),
+    sheet = "species")
 )
 
 clean_data <- drake_plan(
