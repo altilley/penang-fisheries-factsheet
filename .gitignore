@@ -36,3 +36,6 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+## Project specific
+data/raw/penang-fisheries-landings.xlsx

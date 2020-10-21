@@ -7,9 +7,24 @@ library(drake)
 f <- lapply(list.files(path = here::here("R"), full.names = TRUE,
                        include.dirs = TRUE, pattern = "*.R"), source)
 
+# Variables
+raw_data_object_uri <- "gs://penang-catch/penang-fisheries-landings.xlsx"
+
+# Authenticate
+googleCloudStorageR::gcs_auth(json_file = "auth/penang-catch-auth.json")
+
 # Plan analysis ------------------------------------------------------------
 
-full_plan <- rbind()
+get_data <- drake_plan(
+  data_download = target(
+    command = googleCloudStorageR::gcs_get_object(
+      object_name = raw_data_object_uri,
+      saveToDisk = file_out("data/raw/penang-fisheries-landings.xlsx"),
+      overwrite = TRUE)),
+
+)
+
+full_plan <- rbind(get_data)
 
 # Execute plan ------------------------------------------------------------
 
