@@ -34,7 +34,7 @@ get_data <- drake_plan(
 
 test_plan <- drake_plan(
   trip_id_tests = test_trip_id(landings),
-  rec_id_tests = test_rec_id(landings),
+  # rec_id_tests = test_rec_id(landings),
 )
 
 full_plan <- rbind(get_data,
