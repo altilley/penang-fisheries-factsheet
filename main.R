@@ -38,8 +38,13 @@ clean_data <- drake_plan(
 )
 
 test_plan <- drake_plan(
-  trip_id_tests = test_trip_id(landings),
+  trip_id_tests = test_trip_id(landings_clean),
   # rec_id_tests = test_rec_id(landings),
+  imei_tests = test_imei(landings_clean),
+  # species_tests = test_species(landings_clean, species_clean),
+  weight_tests = test_weight(landings_clean),
+  price_tests = test_price(landings_clean),
+)
 )
 
 full_plan <- rbind(get_data,
