@@ -45,10 +45,17 @@ test_plan <- drake_plan(
   weight_tests = test_weight(landings_clean),
   price_tests = test_price(landings_clean),
 )
+
+report_plan <- drake_plan(
+  readme = target(
+    command = rmarkdown::render(knitr_in("README.Rmd"))
+  )
 )
 
 full_plan <- rbind(get_data,
-                   test_plan)
+                   clean_data,
+                   test_plan,
+                   report_plan)
 
 # Execute plan ------------------------------------------------------------
 
