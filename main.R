@@ -26,13 +26,17 @@ get_data <- drake_plan(
     sheet = "catch"),
   species = readxl::read_excel(
     path = file_in("data/raw/penang-fisheries-landings.xlsx"),
-    sheet = "species")
+    sheet = "species"),
 )
 
 clean_data <- drake_plan(
   landings_clean = clean_landings(landings),
   species_clean = clean_species(species),
+  tracks = clean_points(file_in("data/raw/points.csv")),
+  boats = clean_boats(file_in("data/raw/boats.csv")),
 )
+
+
 
 test_plan <- drake_plan(
   trip_id_tests = test_trip_id(landings_clean),

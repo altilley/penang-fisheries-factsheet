@@ -18,3 +18,15 @@ clean_species <- function(species){
   species %>%
     dplyr::mutate(common_malay = tolower(common_malay))
 }
+
+clean_points <- function(path){
+  path %>%
+    readr::read_csv() %>%
+    janitor::clean_names()
+}
+
+clean_boats <- function(path){
+  path %>%
+    readr::read_csv2() %>%
+    janitor::clean_names()
+}
