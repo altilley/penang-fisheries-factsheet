@@ -12,6 +12,15 @@ raw_data_object_uri <- "gs://penang-catch/penang-fisheries-landings.xlsx"
 
 # Authenticate
 googleCloudStorageR::gcs_auth(json_file = "auth/penang-catch-auth.json")
+# bigrquery::bq_auth(path = "auth/tracking-auth.json")
+# Tracks bigquery connection
+# con <- DBI::dbConnect(
+#   bigrquery::bigquery(),
+#   project = "peskas",
+#   dataset = "tracking",
+#   billing = "peskas")
+#
+# tracking_raw <- dplyr::tbl(con, "tracking_raw")
 
 # Plan analysis ------------------------------------------------------------
 
@@ -32,11 +41,10 @@ get_data <- drake_plan(
 clean_data <- drake_plan(
   landings_clean = clean_landings(landings),
   species_clean = clean_species(species),
-  tracks = clean_points(file_in("data/raw/points.csv")),
+  points = clean_points(file_in("data/raw/points.csv")),
   boats = clean_boats(file_in("data/raw/boats.csv")),
+  trips = process_trips(landings_clean, points, boats),
 )
-
-
 
 test_plan <- drake_plan(
   trip_id_tests = test_trip_id(landings_clean),
