@@ -63,7 +63,13 @@ process_trips <- function(landings_clean, points, boats){
   landings_trips %>%
     dplyr::full_join(point_trips) %>%
     dplyr::arrange(date) %>%
-    dplyr::mutate(trip_id = 1:dplyr::n())
+    dplyr::mutate(trip_id = 1:dplyr::n()) %>%
+    dplyr::group_by(fisher) %>%
+    dplyr::mutate(imei_short = dplyr::if_else(!is.na(fisher), dplyr::first(na.omit(imei_short)), imei_short),
+                  boat_name = dplyr::if_else(!is.na(fisher), dplyr::first(na.omit(boat_name)), boat_name)) %>%
+    dplyr::group_by(imei_short) %>%
+    dplyr::mutate(fisher = dplyr::if_else(!is.na(imei_short), dplyr::first(na.omit(fisher)), fisher),
+                  fisher = dplyr::if_else(is.na(fisher), boat_name, fisher))
 
   # points %>%
   #   dplyr::mutate(time = lubridate::with_tz(time, tzone = "Asia/Kuala_Lumpur"),
