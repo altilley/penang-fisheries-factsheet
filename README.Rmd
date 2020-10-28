@@ -1,15 +1,80 @@
 ---
-title: "README"
+title: "Penang fisheries"
 output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 library(ggplot2)
 library(magrittr)
 ```
 
+```{r load-data}
+drake::loadd(trips)
+drake::loadd(points)
+trips <- trips %>%
+  dplyr::filter(date < as.Date("2020-09-01"))
+```
 
+```{r}
+full_info_trips <- dplyr::filter(trips, !is.na(trip_id_landing), !is.na(trip_id_track))
+
+landing_trips <- dplyr::filter(trips, !is.na(trip_id_landing))
+tracking_trips <- dplyr::filter(trips, !is.na(trip_id_track))
+
+landing_fisher_tabyl <- landing_trips %>%
+  janitor::tabyl(fisher)
+
+main_contributor <- trips %>%
+  dplyr::group_by(fisher) %>%
+  dplyr::summarise(n_trips_landing_fisher = dplyr::n_distinct(trip_id_landing, na.rm = T), 
+                   n_trips = dplyr::n(), 
+                   prop = n_trips_landing_fisher/n_trips) %>% 
+  dplyr::filter(n_trips_landing_fisher == max(n_trips_landing_fisher)) 
+
+# tracking_trips %>%
+#   dplyr::group_by(fisher) %>%
+#   dplyr::summarise(first_trip = min(date)) %>%
+#   dplyr::arrange(first_trip)
+```
+
+We report data collected between `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")`. 
+During this period we recorded information about `r nrow(trips)` fishing trips in Penang. 
+The information about these trips was contributed by a total of `r dplyr::n_distinct(trips$fisher)` local fishers and is a combination of tracking and landings. 
+
+During the reporting period, WorldFish installed solar-powered GPS trackers sourced from Pelagic Data Systems Inc. in `r dplyr::n_distinct(points$boat_name)` boats at four key landing sites of Teluk Bahang, Balik Pulau, Seagate and Kuala Binjai.
+Most of the trackers were installed in July or August 2020, but three of them were installed in September or November 2019 which gives us a good coverage over the last year for these boats. 
+Until `r format(max(trips$date), "%d %B %Y")` these units tracked a total of `r nrow(tracking_trips)` trips.  
+
+In addition to the boat tracks, we also collected landings data informally through a WhatsApp group set up with participating fishers. 
+In total, we collected landings information for `r nrow(landing_trips)` trips by `r dplyr::n_distinct(landing_trips$fisher)` fishers. 
+
+Three of these fishers have also a tracker installed on their boats and consequently we have both tracking and landing data for `r nrow(full_info_trips)` trips.
+Most of this landing data, however, comes from the most active fisher.
+This fisher alone contributed landing data for `r max(landing_fisher_tabyl$n)` trips which corresponds to about `r scales::percent(main_contributor$prop[1])` of all their fishing trips over the reporting period. 
+
+```{r}
+points %>%
+  dplyr::filter(time < lubridate::ymd("2020-09-01")) %>%
+  dplyr::left_join(trips, by = c("trip" = "trip_id_track")) %>% 
+  dplyr::group_by(trip) %>%
+  dplyr::slice_sample(prop = 0.1) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(time) %>%
+  dplyr::mutate(trip = forcats::fct_reorder(as.character(trip), !is.na(trip_id_landing))) %>%
+  ggplot(aes(x = lng, y = lat, group = trip, colour = !is.na(trip_id_landing))) +
+  geom_path(size = 0.2, alpha = 0.7) +
+  guides(colour = guide_legend()) +
+  scale_color_manual(values = c("grey70", "#1a4985"), 
+                     labels = c("trips without landing data", "trips with landing data")) +
+  coord_quickmap() +
+  theme_minimal() +
+  theme(legend.position = "bottom", 
+        legend.title = element_blank()) +
+  labs(title = "A visual sample of fishing trips in Penang", 
+       subtitle = "Between September 2019-2020", 
+       x = "Longitude", y = "Latitude")
+```
 ```{r}
 drake::loadd(landings_clean)
 ```
