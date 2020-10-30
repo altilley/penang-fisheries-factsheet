@@ -1,6 +1,6 @@
 # Clean the landings data frame
-clean_landings <- function(landings){
-  landings %>%
+clean_landings <- function(landings, report_dates = NULL){
+  landings_clean <- landings %>%
     dplyr::select(-rec_id, -common_eng) %>%
     dplyr::mutate(date = as.Date(date, tz = "Asia/Kuala_Lumpur")) %>%
     dplyr::mutate(imei = as.integer(imei),
@@ -11,7 +11,18 @@ clean_landings <- function(landings){
                   imei = as.character(imei)) %>%
     dplyr::mutate(common_malay = tolower(common_malay)) %>%
     dplyr::rename(weight_kg = kg,
-                  total_price = total_revenue)
+                  total_price = total_revenue) %>%
+    # put together catches from a single day
+    dplyr::group_by(fisher, date) %>%
+    dplyr::mutate(trip_id = dplyr::first(trip_id))
+
+  if(!is.null(report_dates)){
+    landings_clean %>%
+      dplyr::filter(date >= report_dates[1],
+                    date <= report_dates[2])
+  }
+
+  landings_clean
 }
 
 # Clean the species data frame
@@ -20,10 +31,18 @@ clean_species <- function(species){
     dplyr::mutate(common_malay = tolower(common_malay))
 }
 
-clean_points <- function(path){
-  path %>%
+clean_points <- function(path, report_dates = NULL){
+  points_clean <- path %>%
     readr::read_csv() %>%
     janitor::clean_names()
+
+  if(!is.null(report_dates)){
+    points_clean %<>%
+      dplyr::filter(date >= report_dates[1],
+                    dare <= report_dates[2])
+  }
+
+  points_clean
 }
 
 clean_boats <- function(path){

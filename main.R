@@ -36,14 +36,21 @@ get_data <- drake_plan(
   species = readxl::read_excel(
     path = file_in("data/raw/penang-fisheries-landings.xlsx"),
     sheet = "species"),
+  report_dates = c(as.Date("2019-09-01"), as.Date("2020-08-31")),
 )
 
 clean_data <- drake_plan(
-  landings_clean = clean_landings(landings),
+  landings_clean = clean_landings(landings, report_dates),
   species_clean = clean_species(species),
   points = clean_points(file_in("data/raw/points.csv")),
   boats = clean_boats(file_in("data/raw/boats.csv")),
   trips = process_trips(landings_clean, points, boats),
+)
+
+modeling <- drake_plan(
+  base_formula = brms::brmsformula(. ~ 1 + (1 | fisher) + (1 | wday) + (1 | week)),
+  landing_model = model_landings(trips, base_formula),
+  vessel_model = model_vessel(trips, base_formula),
 )
 
 test_plan <- drake_plan(
@@ -61,13 +68,15 @@ report_plan <- drake_plan(
   )
 )
 
-full_plan <- rbind(get_data,
+full_plan <- dplyr::bind_rows(get_data,
                    clean_data,
                    test_plan,
-                   report_plan)
+                   modeling,
+                   report_plan,
+                   )
 
 # Execute plan ------------------------------------------------------------
 
 if (!is.null(full_plan)) {
-  make(full_plan)
+  make(full_plan, lock_envir = FALSE)
 }
