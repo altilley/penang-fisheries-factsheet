@@ -4,14 +4,20 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 10, fig.height = 7)
 library(ggplot2)
 library(magrittr)
+library(ggdist)
+
+library(brms)
+
 ```
 
 ```{r load-data}
 drake::loadd(trips)
 drake::loadd(points)
+drake::loadd(landings_clean)
+
 trips <- trips %>%
   dplyr::filter(date < as.Date("2020-09-01"))
 ```
@@ -75,8 +81,366 @@ points %>%
        subtitle = "Between September 2019-2020", 
        x = "Longitude", y = "Latitude")
 ```
+
+We are interested in calculating the total catch from artisanal fisheries in Penang and the income it generates. 
+We need three key components to perform these calculations. 
+First, we need to estimate the expected catch weight from each trip and the income it generates. 
+Second, we need to obtain an estimate of the vessel activity throughout the year. 
+Third, we need an estimate of the number of fishers in Penang. 
+
+We use hierarchical Bayesian models as the framework to estimate these figures for four main reasons. 
+First, Bayesian models perform particularly well with relatively small amount of data. 
+Second, a hierarchical model allow us to minimise the biases that a arise from unbalances in the contributed data; both across fishers and across time. 
+Third, using models, instead of simple averages allow us to obtain estimates of the catch even for periods for which we have no comprehensive sampling. 
+Lastly, and most importantly, a Bayesian framework allow us, not only to obtain an estimate of the numbers we are interested on, but also allow us to better understand the uncertainties involved in the calculation. 
+
 ```{r}
-drake::loadd(landings_clean)
+drake::loadd(landing_model)
+drake::loadd(vessel_model)
+
+models <- list(
+  catch = landing_model[[1]], 
+  income = landing_model[[2]], 
+  vessel = vessel_model
+)
+
+predict_overall_mean <- function(model){
+  model %>%
+    posterior_epred(newdata = data.frame(dummy = 1), re_formula = NA) %>%
+    as.data.frame() %>%
+    tibble::as_tibble() %>%
+    dplyr::rename(Estimate = V1)
+}
+
+est_sum <- models %>%
+  purrr::map(. %>%
+               predict_overall_mean() %>%
+               posterior_summary()%>%
+               purrr::array_tree(margin = 2))
+```
+
+
+First, we look at the expected catch weight from a single trip. 
+There was a lot of variability in the catch weight with some trips fishing as little as `r round(min(landing_trips$weight_kg), 1)`kg and some as much as `r round(max(landing_trips$weight_kg), 0)`kg. 
+Nevertheless, using ten thousand Monte Carlo simulations, we found that the average catch was somewhere between `r round(est_sum$catch$Q2.5, 1)`kg and `r round(est_sum$catch$Q97.5, 1)`kg (95% credible intervals) with a mean of `r round(est_sum$catch$Estimate, 1)`kg.
+The average catch showed important differences among fishers, with some consistently landing more catch by weight than the average. 
+More data from different fishers will allow us to better understand what drives these differences. 
+
+That catch represented an average income per trip between RM`r round(est_sum$income$Q2.5)` and RM`r round(est_sum$income$Q97.5)` (mean RM`r round(est_sum$income$Estimate)`). 
+Similar as the catch weight, average income levels showed a large variation among fishers and trips. 
+Some trips provided only RM`r round(min(landing_trips$total_price))` as income for the fishers while some trips provided as much as RM`r round(max(landing_trips$total_price))`. 
+
+We expect the vessel activity coefficient during the study period to be between `r round(est_sum$vessel$Q2.5, 2)` and `r round(est_sum$vessel$Q97.5, 2)` (mean `r round(est_sum$vessel$Estimate, 2)`). 
+Mathematically, this coefficient can be interpreted in two equivalent ways. 
+When applied to a single boat, it can be interpreted as the probability that this boat would to a fishing trip in a given day. 
+When applied to a group of boats, for example the Penang artisanal fishing fleet, it can be interpreted as the proportion of boats that can be expected to be going on a trip in a given day. 
+Although some differences between fishers exist, the largest variations were across time with some weeks being more . 
+
+
+```{r}
+set.seed(7)
+
+predict_yearly_error <- function(model){
+  pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
+                                       to = as.Date("2020-08-31"),
+                                       by = 1)) %>%
+  dplyr::mutate(month = lubridate::month(date), 
+                week = lubridate::isoweek(date), 
+                fort = as.numeric(week) %/% 2,
+                wday = lubridate::wday(date, label = T))
+  
+  posterior_epred(
+    model, 
+    newdata = pred_data, nsamples = 10000, 
+    re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE) %>% 
+    set_colnames(as.character(pred_data$date)) %>%
+    as.data.frame.table() %>%
+    dplyr::mutate(date = as.Date(Var2)) %>%
+    dplyr::rename(Estimate = Freq, sample = Var1) %>%
+    dplyr::inner_join(pred_data, by = "date") %>%
+    tibble::as_tibble() %>%
+    dplyr::select(-Var2)
+}
+
+label_date <- function(x){
+  format(x, "%B") %>%
+    stringr::str_replace("January", paste0("January\n2020"))
+}
+
+label_income <- function(x){
+  x <- scales::label_dollar(prefix = "RM", scale = 1/1000000)(x)
+  x[length(x):(length(x))] <- paste0(x[length(x):(length(x))], "\nmillion")
+  x
+}
+
+label_weight <- function(x){
+  x <- scales::label_number(scale = 1/1000, suffix = "")(x)
+  x[length(x):(length(x))] <- paste0(x[length(x):(length(x))], "\ntonnes")
+  x
+}
+
+posterior_draws <- models %>%
+  purrr::map_dfr(predict_yearly_error, .id = "model") %>%
+  tidyr::pivot_wider(id_cols = c("date", "sample", "month", "week", "wday", "fort"), 
+                     names_from = "model", 
+                     values_from = "Estimate") %>%
+  dplyr::mutate(n_fishers = round(rnorm(dplyr::n(), 1658, 20)), 
+                income = income * vessel * n_fishers,
+                catch = catch * vessel * n_fishers, 
+                vessel = vessel) %>% 
+  dplyr::group_by(month, sample) %>%
+  dplyr::summarise(date = min(date), 
+                   income = sum(income), 
+                   catch = sum(catch), 
+                   vessel = mean(vessel))
+
+plot_ts <- function(x, col){
+  x %>% 
+  ggplot(aes_string(x = "date", y = col, group = 1)) +
+  stat_lineribbon(size = 0.5,
+                  alpha = 1/2,
+                  .width = c(.95, .66)) +
+  # geom_line(aes(group = sample), size = 0.1, alpha = 0.1) +
+  # stat_pointinterval(thickness = 7) +
+  scale_fill_brewer(palette = "Greys") +
+  expand_limits(y = 0) +
+  scale_x_date(date_breaks = "month", minor_breaks = NULL, labels = label_date) +
+  theme_minimal() +
+    theme(axis.title = element_blank(), legend.position = "none")
+}
+
+catch_ts_plot <-
+  posterior_draws %>%
+  plot_ts("catch") +
+    scale_y_continuous(labels = label_weight) +
+    labs(title = "Monthly catch totals by artisanal fishers in Penang", 
+       subtitle = "Weight")
+  
+income_ts_plot  <- 
+  posterior_draws %>%
+  plot_ts("income") +
+    scale_y_continuous(labels = label_income) +
+  labs(subtitle = "Income",
+       caption = "Shaded areas indicate the 66 and 95% credible intervals")
+
+vessel_ts_plot <- 
+  posterior_draws %>%
+  plot_ts("vessel")  +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(subtitle = "Vessel activity")
+# 
+# title_plot <- ggplot() +
+#   labs(title = "Time series") +
+#   theme_minimal()
+cowplot::plot_grid(#title_plot, 
+                   catch_ts_plot, 
+                   income_ts_plot, 
+                   rel_heights = c(1.05, 1),
+                   # vessel_ts_plot,
+                   ncol = 1, align = "v")
+```
+
+```{r}
+annual_totals <- posterior_draws %>%
+  dplyr::group_by(sample) %>%
+  dplyr::summarise(dplyr::across(tidyselect:::where(is.numeric), sum))
+
+ann_sum <- annual_totals %>%
+  dplyr::select_if(is.numeric) %>%
+  posterior_summary() %>%
+  set_names(NULL) %>%
+  purrr::array_tree()
+
+```
+
+Using all these pieces of information we estimate that between the period `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")` **artisanal fishers were very likely (95% probability) to catch between `r round(ann_sum$catch$Q2.5/1000000, 1)` and `r round(ann_sum$catch$Q97.5/1000000, 1)` thousand tonnes in Penang waters, which provided income between RM`r round(ann_sum$income$Q2.5/1000000, 0)` and RM`r round(ann_sum$income$Q97.5/1000000, 0)` million to the local communities**. 
+
+```{r, fig.height=5}
+annual_catch_dist_plot <- annual_totals %>%
+  dplyr::slice_sample(n = 1000, replace = F) %>%
+  ggplot(aes(x = catch)) +
+  stat_dotsinterval(.width = c(.95, .66), fill = "grey90", slab_colour = "grey90") +
+  geom_text(aes(x = mean(catch), 
+                label = stat(paste0("mean: ", round(mean(x)/1000000, 1), " thousand tonnes")), 
+                y = 0, group = 1), stat = "unique", vjust = -1) +
+  scale_x_continuous(labels = scales::label_number(scale = 1/1000000, suffix = " thousand\ntonnes", accuracy = 1)) +
+  theme_minimal() +
+  theme(axis.title = element_blank(), 
+        axis.text.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  labs(title = "Estimated annual catch by artisanal fishers in Penang", 
+       subtitle = paste("Weight"))
+
+annual_income_dist_plot <- annual_totals %>%
+  dplyr::slice_sample(n = 1000, replace = F) %>%
+  ggplot(aes(x = income)) +
+  stat_dotsinterval( .width = c(.95, .66), fill = "grey90", slab_colour = "grey90") +
+  geom_text(aes(x = mean(income), 
+                label = stat(paste0("mean: RM", round(mean(x)/1000000), " million")), 
+                y = 0, group = 1), stat = "unique", vjust = -1) +
+  scale_x_continuous(labels = scales::label_dollar(prefix = "RM", scale = 1/1000000, suffix = "\nmillion")) +
+  theme_minimal() +
+  theme(axis.title = element_blank(), 
+        axis.text.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),) +
+  labs(subtitle = "Income", 
+       caption = "* Each dot corresponds to a simulation in our model. Horizontal lines indicate the 66 and 95% credible intervals")
+
+cowplot::plot_grid(annual_catch_dist_plot, 
+                   annual_income_dist_plot, 
+                   ncol = 1,
+                   align = "v")
+```
+
+
+```{r eval = F}
+drake::loadd(landing_model)
+drake::loadd(vessel_model)
+
+landing_model[[1]] %>%
+  predict_overall_mean() %>%
+  posterior_summary()
+
+
+
+
+vessel_model %>%
+  posterior_samples(pars = "^Intercept") %>%
+  as.data.frame() %>%
+  tibble::as.tibble() %>%
+  dplyr::mutate(Estimate = plogis(Intercept)) %>%
+  ggplot(aes(x = Estimate, y = 0)) +
+  stat_halfeye() +
+  theme_minimal()
+
+landing_model[[2]] %>%
+  posterior_samples(pars = c("^Intercept", "sigma")) %>%
+  as.data.frame() %>%
+  tibble::as.tibble() %>%
+  dplyr::mutate(Estimate = exp(Intercept + (sigma)/2), m = mean(Estimate)) %>%
+  ggplot(aes(x = Estimate, y = 0)) +
+  stat_halfeye() +
+  theme_minimal()
+
+landing_model[[2]] %>%
+  posterior_predict(newdata = data.frame(dummy = 1), re_formula = NA) %>%
+  as.data.frame() %>%
+  tibble::as.tibble() %>%
+  dplyr::mutate(Estimate = V1, 
+                m = mean(Estimate)) %>%
+  ggplot(aes(x = Estimate, y = 0)) +
+  stat_halfeye() +
+  theme_minimal()
+
+predict_yearly <- function(model){
+  pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
+                                       to = as.Date("2020-08-31"),
+                                       by = 1)) %>%
+  dplyr::mutate(month = lubridate::month(date), 
+                week = lubridate::isoweek(date), 
+                wday = lubridate::wday(date, label = T))
+  
+  predict(model, pred_data, re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE) %>%
+    as.data.frame() %>%
+    dplyr::bind_cols(pred_data) 
+}
+
+plot_time_prediction <- function(x) {
+  x %>%
+    ggplot(aes(x = date, y = Estimate)) +
+    geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5), fill = "grey70") +
+    geom_line() +
+    theme_minimal()
+}
+
+predict_yearly(vessel_model) %>%
+  stat_dotsinterval()
+```
+
+
+```{r, eval = FALSE}
+library(brms)
+landing_model_data <- landing_trips %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(month = lubridate::month(date), 
+                week = lubridate::isoweek(date), 
+                wday = lubridate::wday(date, label = T), 
+                num_date = as.numeric(date), 
+                num_date = num_date - min(num_date)) %>%
+  dplyr::group_by(fisher, date) %>%
+  dplyr::slice(1)
+
+m0 <- brm(weight_kg ~ 1 + (1 | fisher) + (1 | wday) + (1 | month), 
+          data = landing_model_data, 
+          family = lognormal, 
+          iter = 4000, 
+          save_pars = save_pars(all = TRUE),
+          cores = 4)
+
+m2 <- brm(weight_kg ~ 1 + arma(time = num_date, gr = fisher, cov = TRUE) + (1 | fisher) + (1 | wday) + (1 | week), 
+          data = landing_model_data, 
+          family = lognormal, 
+          control = list(adapt_delta = 0.9),
+          save_pars = save_pars(all = TRUE),
+          iter = 4000, 
+          cores = 4)
+
+pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
+                                       to = as.Date("2020-08-31"),
+                                       by = 1)) %>%
+  dplyr::mutate(month = lubridate::month(date), 
+                week = lubridate::isoweek(date), 
+                wday = lubridate::wday(date, label = T))
+
+plot_time_prediction <- function(x) {
+  x %>%
+    ggplot(aes(x = date, y = Estimate)) +
+    geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5), fill = "grey70") +
+    geom_line() +
+    theme_minimal()
+}
+
+samples_to_df <- . %>%
+  set_colnames(as.character(pred_data$date)) %>%
+  as.data.frame.table() %>%
+  dplyr::mutate(date = as.Date(Var2)) %>%
+  dplyr::rename(Estimate = Freq, sample = Var1) %>%
+  dplyr::inner_join(pred_data, by = "date")
+
+m0_pred_summary <- predict(m0, pred_data, re_formula = ~ (1 | wday) + (1 | month), allow_new_levels = TRUE) %>%
+  as.data.frame() %>%
+  dplyr::bind_cols(pred_data) 
+
+m0_pred_samples <- predict(m0, pred_data, re_formula = ~ (1 | wday) + (1 | month),
+                           allow_new_levels = TRUE, summary = F) %>%
+  samples_to_df()
+
+m1_pred_summary <- predict(m1, pred_data, re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE) %>%
+  as.data.frame() %>%
+  dplyr::bind_cols(pred_data) 
+
+m1_pred_samples <- predict(m1, pred_data, re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE, 
+                           summary = FALSE)  %>%
+  samples_to_df()
+
+
+m0_pred_samples %>%
+  dplyr::group_by(sample) %>%
+  dplyr::summarise(yearly_total = sum(Estimate)) %>%
+  dplyr::mutate(group = rep(c("A", "B"), each = 4000)) %>%
+  ggplot(aes(x = yearly_total, y = 1)) +
+  stat_dotsinterval()
+```
+
+
+## Landings
+
+
+
+
+```{r}
 ```
 
 ```{r, message=FALSE}
@@ -95,12 +459,18 @@ fisher_summary <- landings_clean %>%
     imei = dplyr::first(imei),
     first_trip = min(date), 
     last_trip = max(date),
+    n_trips = dplyr::n_distinct(trip_id),
     total_price = sum(total_price), 
     weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(common_malay))
+    n_species = dplyr::n_distinct(common_malay)) %>%
+  dplyr::arrange(-n_trips)
 ```
 
-Between `r format(min(trip_summary$date), "%d %B %Y")` and `r format(max(trip_summary$date), "%d %B %Y")` we recorded `r nrow(trip_summary)` trips by `r dplyr::n_distinct(landings_clean$fisher)` fishers. During this time, GPS trackers were installed in `r length(na.omit(fisher_summary$imei))` boats. 
+Between `r format(min(trip_summary$date), "%d %B %Y")` and `r format(max(trip_summary$date), "%d %B %Y")` we recorded landings for `r nrow(trip_summary)` trips by `r dplyr::n_distinct(landings_clean$fisher)` fishers. 
+
+
+
+During this time, GPS trackers were installed in `r length(na.omit(fisher_summary$imei))` boats. 
 
 ```{r}
 trip_summary %>%
@@ -158,4 +528,75 @@ trip_summary %>%
   geom_point(aes(colour = fisher))
 ```
 
+
+```{r}
+predict_fisher_differences <- function(model){
+  model %>%
+    posterior_epred(newdata = data.frame(fisher = unique(model$data$fisher)), re_formula = ~ (1 | fisher)) %>%
+    set_colnames(unique(model$data$fisher)) %>%
+    as.data.frame.table() %>%
+    dplyr::rename(fisher = Var2) %>%
+    dplyr::rename(Estimate = Freq, sample = Var1)
+}
+
+models %>%
+  purrr::map_dfr(.f = predict_fisher_differences, .id = "model") %>%
+  dplyr::mutate(
+    # Randomise names to protect identity
+    fisher = factor(
+      x = fisher, 
+      labels =  randomNames::randomNames(
+        n = dplyr::n_distinct(fisher), 
+        ethnicity = 6, 
+        which.names = "first", 
+        sample.with.replacement = FALSE)),
+    # Order fishers by catch weight
+    fisher = forcats::fct_reorder2(
+      .f = fisher, 
+      .x = Estimate, 
+      .y = as.numeric(model == "catch"), 
+      .fun = weighted.mean, 
+      .desc = TRUE), 
+    # Reverse order so that fishers without catch show at the bottom of the plot
+    fisher = forcats::fct_rev(f = fisher),
+    model = forcats::fct_relevel(model, "catch")) %>%
+  ggplot(aes(x = Estimate, y = fisher)) +
+  stat_pointinterval(point_size = 1.5) +
+  facet_wrap("model", scales = "free_x") +
+  theme_minimal() +
+  labs(
+    title = "There were important differences among fishers",
+    caption = "* Fisher names have been changed to protect their identity")
+
+predict_wday_differences <- function(model){
+  model %>%
+    posterior_epred(newdata = data.frame(wday = unique(model$data$wday)), re_formula = ~ (1 | wday)) %>%
+    set_colnames(unique(model$data$wday)) %>%
+    as.data.frame.table() %>%
+    dplyr::rename(wday = Var2) %>%
+    dplyr::rename(Estimate = Freq, sample = Var1)
+}
+
+models %>%
+  purrr::map_dfr(.f = predict_wday_differences, .id = "model")%>%
+  ggplot(aes(x = Estimate, y = wday)) +
+  stat_pointinterval() +
+  facet_wrap("model", scales = "free_x")
+
+predict_week_differences <- function(model){
+  model %>%
+    posterior_epred(newdata = data.frame(week = unique(model$data$week)), re_formula = ~ (1 | week)) %>%
+    set_colnames(unique(model$data$week)) %>%
+    as.data.frame.table() %>%
+    dplyr::rename(week = Var2) %>%
+    dplyr::rename(Estimate = Freq, sample = Var1)
+}
+
+models %>%
+  purrr::map_dfr(.f = predict_week_differences, .id = "model") %>%
+  dplyr::mutate(week = forcats::fct_reorder(week, as.numeric(as.character(week)))) %>%
+  ggplot(aes(x = Estimate, y = week)) +
+  stat_pointinterval() +
+  facet_wrap("model", scales = "free_x")
+```
 
