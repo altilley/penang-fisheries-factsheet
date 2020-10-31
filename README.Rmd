@@ -4,12 +4,18 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 10, fig.height = 7)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 10, fig.height = 7, fig.showtext = TRUE, warning = F)
 library(ggplot2)
 library(magrittr)
 library(ggdist)
 library(ggforce)
 library(brms)
+library(showtext)
+font_paths("fonts")
+font_add(family = "RobotoC", regular = "fonts/Roboto_Condensed/RobotoCondensed-Regular.ttf", 
+         bold = "fonts/Roboto_Condensed/RobotoCondensed-Bold.ttf")
+showtext_auto()
+# theme_set(theme_minimal(base_size = 16, base_family = "Roboto Condensed"))
 ```
 
 ```{r load-data}
@@ -80,8 +86,10 @@ points %>%
         legend.title = element_blank(), 
         axis.title = element_blank(), 
         axis.text = element_blank(), 
-        panel.grid = element_blank()) +
-  labs(title = paste("A visual sample of", nrow(tracking_trips), "fishing trips in Penang"), 
+        panel.grid = element_blank(), 
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(face = "bold")) +
+  labs(title = paste("A VISUAL SAMPLE OF", nrow(tracking_trips), "FISHING TRIPS IN PENANG"), 
        caption = "* Trips recorded between 01 September 2019 and 31 August 2020", 
        x = "Longitude", y = "Latitude")
 ```
@@ -205,14 +213,16 @@ annual_catch_dist_plot <- annual_totals %>%
   stat_dotsinterval(.width = c(.90, .66), fill = "grey90", slab_colour = "grey90") +
   geom_text(aes(x = mean(catch), 
                 label = stat(paste0("mean: ", round(mean(x)/1000000, 1), " thousand tonnes")), 
-                y = 0, group = 1), stat = "unique", vjust = -1) +
+                y = 0, group = 1), stat = "unique", vjust = -1, family = "RobotoC") +
   scale_x_continuous(labels = scales::label_number(scale = 1/1000000, suffix = " thousand\ntonnes", accuracy = 1)) +
   theme_minimal() +
   theme(axis.title = element_blank(), 
         axis.text.y = element_blank(), 
         panel.grid.major.y = element_blank(),
-        panel.grid.minor.y = element_blank()) +
-  labs(title = "Estimated annual catch by artisanal fishers in Penang", 
+        panel.grid.minor.y = element_blank(), 
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(face = "bold")) +
+  labs(title = toupper("Estimated annual catch by artisanal fishers in Penang"), 
        subtitle = paste("Weight"))
 
 annual_income_dist_plot <- annual_totals %>%
@@ -221,13 +231,15 @@ annual_income_dist_plot <- annual_totals %>%
   stat_dotsinterval( .width = c(.90, .66), fill = "grey90", slab_colour = "grey90") +
   geom_text(aes(x = mean(income), 
                 label = stat(paste0("mean: RM", round(mean(x)/1000000), " million")), 
-                y = 0, group = 1), stat = "unique", vjust = -1) +
+                y = 0, group = 1), stat = "unique", vjust = -1, family = "RobotoC") +
   scale_x_continuous(labels = scales::label_dollar(prefix = "RM", scale = 1/1000000, suffix = "\nmillion")) +
   theme_minimal() +
   theme(axis.title = element_blank(), 
         axis.text.y = element_blank(), 
         panel.grid.major.y = element_blank(),
-        panel.grid.minor.y = element_blank(),) +
+        panel.grid.minor.y = element_blank(), 
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(face = "bold")) +
   labs(subtitle = "Income", 
        caption = "* Each dot corresponds to a simulation in our model. Horizontal lines indicate the 66 and 90% credible intervals")
 
@@ -270,14 +282,16 @@ plot_ts <- function(x, col){
   expand_limits(y = 0) +
   scale_x_date(date_breaks = "month", minor_breaks = NULL, labels = label_date) +
   theme_minimal() +
-    theme(axis.title = element_blank(), legend.position = "none")
+    theme(axis.title = element_blank(), legend.position = "none", 
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(face = "bold"))
 }
 
 catch_ts_plot <-
   posterior_draws %>%
   plot_ts("catch") +
     scale_y_continuous(labels = label_weight) +
-    labs(title = "Monthly catch totals by artisanal fishers in Penang", 
+    labs(title = toupper("Monthly catch totals by artisanal fishers in Penang"), 
        subtitle = "Weight")
   
 income_ts_plot  <- 
@@ -285,7 +299,7 @@ income_ts_plot  <-
   plot_ts("income") +
     scale_y_continuous(labels = label_income) +
   labs(subtitle = "Income",
-       caption = "Shaded areas indicate the 66 and 90% credible intervals")
+       caption = "* Shaded areas indicate the 66 and 90% credible intervals")
 
 vessel_ts_plot <- 
   posterior_draws %>%
@@ -361,7 +375,9 @@ p1 <- species_summary %>%
         plot.subtitle = element_text(hjust = 0.5), 
         axis.text.y = element_text(hjust = 0.5), 
         panel.grid.major.y = element_blank(), 
-        plot.background = element_blank()) +
+        plot.background = element_blank(), 
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(face = "bold")) +
   labs(subtitle = "Income", 
        caption = "* Species that accounted for less than 1% of the total catch or weight were grouped together")
 
@@ -385,7 +401,9 @@ p2  <- species_summary %>%
         axis.text.y.right = element_text(hjust = 0.5), 
         plot.subtitle = element_text(hjust = 0.5), 
         panel.grid.major.y = element_blank(), 
-        plot.background = element_blank()) +
+        plot.background = element_blank(), 
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(face = "bold")) +
   labs(subtitle = "Weight")
 
 plink <- species_summary %>%
@@ -408,12 +426,13 @@ plink <- species_summary %>%
   theme_no_axes(theme_minimal())+
   theme(legend.position = "none", axis.title = element_blank(), 
         plot.margin = unit(c(1,0,1, 0), units = "mm"), 
-        plot.title = element_text(hjust = 0.5)) +
-  labs(title = "Contribution of different species to reported landings")
+        text = element_text(family = "RobotoC"), 
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  labs(title = toupper("Contribution of different species to reported landings"))
   
 
 cowplot::plot_grid(p2, plink, p1, 
-                   nrow = 1, align ="h", rel_widths = c(1,0.33, 1))
+                   nrow = 1, align ="h", rel_widths = c(1,0.2, 1))
 ```
 
 ## Other unfinished plots
