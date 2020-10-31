@@ -8,21 +8,23 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, fig.width = 10, fig.height 
 library(ggplot2)
 library(magrittr)
 library(ggdist)
-
+library(ggforce)
 library(brms)
-
 ```
 
 ```{r load-data}
+
 drake::loadd(trips)
 drake::loadd(points)
 drake::loadd(landings_clean)
+drake::loadd(landing_model)
+drake::loadd(vessel_model)
 
 trips <- trips %>%
   dplyr::filter(date < as.Date("2020-09-01"))
 ```
 
-```{r}
+```{r trip-stats}
 full_info_trips <- dplyr::filter(trips, !is.na(trip_id_landing), !is.na(trip_id_track))
 
 landing_trips <- dplyr::filter(trips, !is.na(trip_id_landing))
@@ -37,29 +39,26 @@ main_contributor <- trips %>%
                    n_trips = dplyr::n(), 
                    prop = n_trips_landing_fisher/n_trips) %>% 
   dplyr::filter(n_trips_landing_fisher == max(n_trips_landing_fisher)) 
-
-# tracking_trips %>%
-#   dplyr::group_by(fisher) %>%
-#   dplyr::summarise(first_trip = min(date)) %>%
-#   dplyr::arrange(first_trip)
 ```
 
 We report data collected between `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")`. 
-During this period we recorded information about `r nrow(trips)` fishing trips in Penang. 
+During this year we recorded information about `r nrow(trips)` fishing trips in Penang. 
 The information about these trips was contributed by a total of `r dplyr::n_distinct(trips$fisher)` local fishers and is a combination of tracking and landings. 
 
-During the reporting period, WorldFish installed solar-powered GPS trackers sourced from Pelagic Data Systems Inc. in `r dplyr::n_distinct(points$boat_name)` boats at four key landing sites of Teluk Bahang, Balik Pulau, Seagate and Kuala Binjai.
-Most of the trackers were installed in July or August 2020, but three of them were installed in September or November 2019 which gives us a good coverage over the last year for these boats. 
+Up to `r format(max(trips$date), "%d %B %Y")`, WorldFish installed solar-powered GPS trackers sourced from Pelagic Data Systems Inc. in `r dplyr::n_distinct(points$boat_name)` boats at four key landing sites of Teluk Bahang, Balik Pulau, Seagate and Kuala Binjai.
+Most of the trackers were installed in July or August 2020, but three of them were installed in September or November 2019 which allow us to get a better picture of their activity across the year. 
 Until `r format(max(trips$date), "%d %B %Y")` these units tracked a total of `r nrow(tracking_trips)` trips.  
 
-In addition to the boat tracks, we also collected landings data informally through a WhatsApp group set up with participating fishers. 
+In addition to the tracking data, we also collected landings data. 
+Data collection was performed informally through a WhatsApp group set up with participating fishers. 
 In total, we collected landings information for `r nrow(landing_trips)` trips by `r dplyr::n_distinct(landing_trips$fisher)` fishers. 
 
-Three of these fishers have also a tracker installed on their boats and consequently we have both tracking and landing data for `r nrow(full_info_trips)` trips.
-Most of this landing data, however, comes from the most active fisher.
+Three of the fishers that contributed landings data also had a tracker installed on their boats. 
+Consequently we have both tracking and landing data for `r nrow(full_info_trips)` trips.
+Most of the landing data, however, comes from the single most active fisher in the group.
 This fisher alone contributed landing data for `r max(landing_fisher_tabyl$n)` trips which corresponds to about `r scales::percent(main_contributor$prop[1])` of all their fishing trips over the reporting period. 
 
-```{r}
+```{r tracks-figure, fig.height=10}
 points %>%
   dplyr::filter(time < lubridate::ymd("2020-09-01")) %>%
   dplyr::left_join(trips, by = c("trip" = "trip_id_track")) %>% 
@@ -69,24 +68,32 @@ points %>%
   dplyr::arrange(time) %>%
   dplyr::mutate(trip = forcats::fct_reorder(as.character(trip), !is.na(trip_id_landing))) %>%
   ggplot(aes(x = lng, y = lat, group = trip, colour = !is.na(trip_id_landing))) +
-  geom_path(size = 0.2, alpha = 0.7) +
+  geom_path(size = 0.3, alpha = 0.5) +
   guides(colour = guide_legend()) +
-  scale_color_manual(values = c("grey70", "#1a4985"), 
+  scale_color_manual(values = c("grey70", "grey30"), 
+                     # values = c("grey70", "#1a4985"), 
                      labels = c("trips without landing data", "trips with landing data")) +
   coord_quickmap() +
   theme_minimal() +
-  theme(legend.position = "bottom", 
-        legend.title = element_blank()) +
-  labs(title = "A visual sample of fishing trips in Penang", 
-       subtitle = "Between September 2019-2020", 
+  theme(legend.position = c(1,1),
+        legend.justification = c(1,1),
+        legend.title = element_blank(), 
+        axis.title = element_blank(), 
+        axis.text = element_blank(), 
+        panel.grid = element_blank()) +
+  labs(title = paste("A visual sample of", nrow(tracking_trips), "fishing trips in Penang"), 
+       caption = "* Trips recorded between 01 September 2019 and 31 August 2020", 
        x = "Longitude", y = "Latitude")
 ```
 
+## Catch weight and income
+
 We are interested in calculating the total catch from artisanal fisheries in Penang and the income it generates. 
-We need three key components to perform these calculations. 
-First, we need to estimate the expected catch weight from each trip and the income it generates. 
-Second, we need to obtain an estimate of the vessel activity throughout the year. 
-Third, we need an estimate of the number of fishers in Penang. 
+We need four key components to perform these calculations. 
+First, we need to estimate the expected catch weight from each trip.
+Second, we estimate the expected income that the catch provides to artisanal fishers. 
+Third, we need to obtain an estimate of the vessel activity throughout the year. 
+Fourth, we need an estimate of the number of fishers in Penang. 
 
 We use hierarchical Bayesian models as the framework to estimate these figures for four main reasons. 
 First, Bayesian models perform particularly well with relatively small amount of data. 
@@ -94,15 +101,11 @@ Second, a hierarchical model allow us to minimise the biases that a arise from u
 Third, using models, instead of simple averages allow us to obtain estimates of the catch even for periods for which we have no comprehensive sampling. 
 Lastly, and most importantly, a Bayesian framework allow us, not only to obtain an estimate of the numbers we are interested on, but also allow us to better understand the uncertainties involved in the calculation. 
 
-```{r}
-drake::loadd(landing_model)
-drake::loadd(vessel_model)
-
+```{r model-stats}
 models <- list(
   catch = landing_model[[1]], 
   income = landing_model[[2]], 
-  vessel = vessel_model
-)
+  vessel = vessel_model)
 
 predict_overall_mean <- function(model){
   model %>%
@@ -115,31 +118,35 @@ predict_overall_mean <- function(model){
 est_sum <- models %>%
   purrr::map(. %>%
                predict_overall_mean() %>%
-               posterior_summary()%>%
+               posterior_summary(probs = c(0.05, 0.95)) %>%
                purrr::array_tree(margin = 2))
 ```
 
-
 First, we look at the expected catch weight from a single trip. 
 There was a lot of variability in the catch weight with some trips fishing as little as `r round(min(landing_trips$weight_kg), 1)`kg and some as much as `r round(max(landing_trips$weight_kg), 0)`kg. 
-Nevertheless, using ten thousand Monte Carlo simulations, we found that the average catch was somewhere between `r round(est_sum$catch$Q2.5, 1)`kg and `r round(est_sum$catch$Q97.5, 1)`kg (95% credible intervals) with a mean of `r round(est_sum$catch$Estimate, 1)`kg.
+Nevertheless, using ten thousand Monte Carlo simulations in our Bayesian models, we found that the average catch was very likely between `r round(est_sum$catch$Q5, 1)`kg and `r round(est_sum$catch$Q95, 1)`kg (90% credible intervals, mean `r round(est_sum$catch$Estimate, 1)`kg).
 The average catch showed important differences among fishers, with some consistently landing more catch by weight than the average. 
-More data from different fishers will allow us to better understand what drives these differences. 
+More data from a larger number of fishers will allow us to better understand what drives these differences. 
 
-That catch represented an average income per trip between RM`r round(est_sum$income$Q2.5)` and RM`r round(est_sum$income$Q97.5)` (mean RM`r round(est_sum$income$Estimate)`). 
-Similar as the catch weight, average income levels showed a large variation among fishers and trips. 
+Second, we look at the expected income obtained from a fishing trip. 
+We found that each fishing trip was very likely to provide an income between RM`r round(est_sum$income$Q5)` and RM`r round(est_sum$income$Q95)` (mean RM`r round(est_sum$income$Estimate)`) to artisanal fishers. 
+Similar as the catch weight, average income levels showed a large variation. 
 Some trips provided only RM`r round(min(landing_trips$total_price))` as income for the fishers while some trips provided as much as RM`r round(max(landing_trips$total_price))`. 
 
-We expect the vessel activity coefficient during the study period to be between `r round(est_sum$vessel$Q2.5, 2)` and `r round(est_sum$vessel$Q97.5, 2)` (mean `r round(est_sum$vessel$Estimate, 2)`). 
-Mathematically, this coefficient can be interpreted in two equivalent ways. 
+Third, we investigate the vessel activity coefficient during the study period. 
+We found that this coefficient was very likely to be between `r round(est_sum$vessel$Q5, 2)` and `r round(est_sum$vessel$Q95, 2)` (mean `r round(est_sum$vessel$Estimate, 2)`). 
+Mathematically, this coefficient can be interpreted in two (equivalent) ways. 
 When applied to a single boat, it can be interpreted as the probability that this boat would to a fishing trip in a given day. 
 When applied to a group of boats, for example the Penang artisanal fishing fleet, it can be interpreted as the proportion of boats that can be expected to be going on a trip in a given day. 
-Although some differences between fishers exist, the largest variations were across time with some weeks being more . 
+Although some differences between fishers exist, the largest variations were across time. 
+Vessel activity appeared to be lessened during Fridays and Sundays and in some particular weeks of the year, presumably in response to weahter events. 
 
+Lastly, we obtained the information about Penang's fishing fleet based on the number of active and registered fishers. 
+In 2018 there were 1,658 fishers registered. 
+This number might differ from the number of fishers during the reporting period, but we expect the updated number to be within 50 fishers from the 2018 number. 
+We incorporate this uncertainty in all estimates we present.
 
-```{r}
-set.seed(7)
-
+```{r yearly-estimates}
 predict_yearly_error <- function(model){
   pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
                                        to = as.Date("2020-08-31"),
@@ -162,23 +169,6 @@ predict_yearly_error <- function(model){
     dplyr::select(-Var2)
 }
 
-label_date <- function(x){
-  format(x, "%B") %>%
-    stringr::str_replace("January", paste0("January\n2020"))
-}
-
-label_income <- function(x){
-  x <- scales::label_dollar(prefix = "RM", scale = 1/1000000)(x)
-  x[length(x):(length(x))] <- paste0(x[length(x):(length(x))], "\nmillion")
-  x
-}
-
-label_weight <- function(x){
-  x <- scales::label_number(scale = 1/1000, suffix = "")(x)
-  x[length(x):(length(x))] <- paste0(x[length(x):(length(x))], "\ntonnes")
-  x
-}
-
 posterior_draws <- models %>%
   purrr::map_dfr(predict_yearly_error, .id = "model") %>%
   tidyr::pivot_wider(id_cols = c("date", "sample", "month", "week", "wday", "fort"), 
@@ -194,14 +184,88 @@ posterior_draws <- models %>%
                    catch = sum(catch), 
                    vessel = mean(vessel))
 
+annual_totals <- posterior_draws %>%
+  dplyr::group_by(sample) %>%
+  dplyr::summarise(dplyr::across(tidyselect:::where(is.numeric), sum))
+
+ann_sum <- annual_totals %>%
+  dplyr::select_if(is.numeric) %>%
+  posterior_summary(probs = c(0.05, 0.95)) %>%
+  set_names(NULL) %>%
+  purrr::array_tree()
+```
+
+Using all these pieces of information we estimate that between the period `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")` **artisanal fishers were very likely (90% probability) to catch between `r round(ann_sum$catch$Q5/1000000, 1)` and `r round(ann_sum$catch$Q95/1000000, 1)` thousand tonnes in Penang waters, which provided income between RM`r round(ann_sum$income$Q5/1000000, 0)` and RM`r round(ann_sum$income$Q95/1000000, 0)` million to the local communities**. 
+
+```{r annual-figure, fig.height=5}
+
+annual_catch_dist_plot <- annual_totals %>%
+  dplyr::slice_sample(n = 1000, replace = F) %>%
+  ggplot(aes(x = catch)) +
+  stat_dotsinterval(.width = c(.90, .66), fill = "grey90", slab_colour = "grey90") +
+  geom_text(aes(x = mean(catch), 
+                label = stat(paste0("mean: ", round(mean(x)/1000000, 1), " thousand tonnes")), 
+                y = 0, group = 1), stat = "unique", vjust = -1) +
+  scale_x_continuous(labels = scales::label_number(scale = 1/1000000, suffix = " thousand\ntonnes", accuracy = 1)) +
+  theme_minimal() +
+  theme(axis.title = element_blank(), 
+        axis.text.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  labs(title = "Estimated annual catch by artisanal fishers in Penang", 
+       subtitle = paste("Weight"))
+
+annual_income_dist_plot <- annual_totals %>%
+  dplyr::slice_sample(n = 1000, replace = F) %>%
+  ggplot(aes(x = income)) +
+  stat_dotsinterval( .width = c(.90, .66), fill = "grey90", slab_colour = "grey90") +
+  geom_text(aes(x = mean(income), 
+                label = stat(paste0("mean: RM", round(mean(x)/1000000), " million")), 
+                y = 0, group = 1), stat = "unique", vjust = -1) +
+  scale_x_continuous(labels = scales::label_dollar(prefix = "RM", scale = 1/1000000, suffix = "\nmillion")) +
+  theme_minimal() +
+  theme(axis.title = element_blank(), 
+        axis.text.y = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),) +
+  labs(subtitle = "Income", 
+       caption = "* Each dot corresponds to a simulation in our model. Horizontal lines indicate the 66 and 90% credible intervals")
+
+cowplot::plot_grid(annual_catch_dist_plot, 
+                   annual_income_dist_plot, 
+                   ncol = 1,
+                   align = "v")
+```
+
+Although these wide ranges suggest a large uncertainty, it is actually a remarkable achievement considering the limited amount of data used to generate them.
+During the year we observe that the catch weight and income stayed within the credible intervals of our estimates throughout the years. 
+
+```{r timeseries-figure}
+set.seed(7)
+
+label_date <- function(x){
+  format(x, "%B") %>%
+    stringr::str_replace("January", paste0("January\n2020"))
+}
+
+label_income <- function(x){
+  x <- scales::label_dollar(prefix = "RM", scale = 1/1000000)(x)
+  x[length(x):(length(x)-1)] <- paste0(x[length(x):(length(x)-1)], "\nmillion")
+  x
+}
+
+label_weight <- function(x){
+  x <- scales::label_number(scale = 1/1000, suffix = "")(x)
+  x[length(x):(length(x)-1)] <- paste0(x[length(x):(length(x)-1)], "\ntonnes")
+  x
+}
+
 plot_ts <- function(x, col){
   x %>% 
   ggplot(aes_string(x = "date", y = col, group = 1)) +
   stat_lineribbon(size = 0.5,
                   alpha = 1/2,
-                  .width = c(.95, .66)) +
-  # geom_line(aes(group = sample), size = 0.1, alpha = 0.1) +
-  # stat_pointinterval(thickness = 7) +
+                  .width = c(.90, .66)) +
   scale_fill_brewer(palette = "Greys") +
   expand_limits(y = 0) +
   scale_x_date(date_breaks = "month", minor_breaks = NULL, labels = label_date) +
@@ -221,17 +285,14 @@ income_ts_plot  <-
   plot_ts("income") +
     scale_y_continuous(labels = label_income) +
   labs(subtitle = "Income",
-       caption = "Shaded areas indicate the 66 and 95% credible intervals")
+       caption = "Shaded areas indicate the 66 and 90% credible intervals")
 
 vessel_ts_plot <- 
   posterior_draws %>%
   plot_ts("vessel")  +
   scale_y_continuous(labels = scales::label_percent()) +
   labs(subtitle = "Vessel activity")
-# 
-# title_plot <- ggplot() +
-#   labs(title = "Time series") +
-#   theme_minimal()
+
 cowplot::plot_grid(#title_plot, 
                    catch_ts_plot, 
                    income_ts_plot, 
@@ -240,294 +301,124 @@ cowplot::plot_grid(#title_plot,
                    ncol = 1, align = "v")
 ```
 
-```{r}
-annual_totals <- posterior_draws %>%
-  dplyr::group_by(sample) %>%
-  dplyr::summarise(dplyr::across(tidyselect:::where(is.numeric), sum))
+A larger sample size, both for landings and tracking (which we use to determine vessel activity) will allow us to detect smaller variations across time and answer other questions to improve the management of the fisheries and improve the livelihoods of artisanal fishers. 
 
-ann_sum <- annual_totals %>%
-  dplyr::select_if(is.numeric) %>%
-  posterior_summary() %>%
-  set_names(NULL) %>%
-  purrr::array_tree()
+## Catch composition
 
-```
+We also looked at the catch composition in the trips where we recorded data.
+Although composition data is, so far, biased and should not be taken as indicative of Penang's catch, we can already distinguish some interesting patterns. 
+*Text to be written once species/grade data is of sufficient quality*.
 
-Using all these pieces of information we estimate that between the period `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")` **artisanal fishers were very likely (95% probability) to catch between `r round(ann_sum$catch$Q2.5/1000000, 1)` and `r round(ann_sum$catch$Q97.5/1000000, 1)` thousand tonnes in Penang waters, which provided income between RM`r round(ann_sum$income$Q2.5/1000000, 0)` and RM`r round(ann_sum$income$Q97.5/1000000, 0)` million to the local communities**. 
+```{r catch-composition-figure, fig.height = 3.5}
 
-```{r, fig.height=5}
-annual_catch_dist_plot <- annual_totals %>%
-  dplyr::slice_sample(n = 1000, replace = F) %>%
-  ggplot(aes(x = catch)) +
-  stat_dotsinterval(.width = c(.95, .66), fill = "grey90", slab_colour = "grey90") +
-  geom_text(aes(x = mean(catch), 
-                label = stat(paste0("mean: ", round(mean(x)/1000000, 1), " thousand tonnes")), 
-                y = 0, group = 1), stat = "unique", vjust = -1) +
-  scale_x_continuous(labels = scales::label_number(scale = 1/1000000, suffix = " thousand\ntonnes", accuracy = 1)) +
-  theme_minimal() +
-  theme(axis.title = element_blank(), 
-        axis.text.y = element_blank(), 
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor.y = element_blank()) +
-  labs(title = "Estimated annual catch by artisanal fishers in Penang", 
-       subtitle = paste("Weight"))
-
-annual_income_dist_plot <- annual_totals %>%
-  dplyr::slice_sample(n = 1000, replace = F) %>%
-  ggplot(aes(x = income)) +
-  stat_dotsinterval( .width = c(.95, .66), fill = "grey90", slab_colour = "grey90") +
-  geom_text(aes(x = mean(income), 
-                label = stat(paste0("mean: RM", round(mean(x)/1000000), " million")), 
-                y = 0, group = 1), stat = "unique", vjust = -1) +
-  scale_x_continuous(labels = scales::label_dollar(prefix = "RM", scale = 1/1000000, suffix = "\nmillion")) +
-  theme_minimal() +
-  theme(axis.title = element_blank(), 
-        axis.text.y = element_blank(), 
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor.y = element_blank(),) +
-  labs(subtitle = "Income", 
-       caption = "* Each dot corresponds to a simulation in our model. Horizontal lines indicate the 66 and 95% credible intervals")
-
-cowplot::plot_grid(annual_catch_dist_plot, 
-                   annual_income_dist_plot, 
-                   ncol = 1,
-                   align = "v")
-```
-
-
-```{r eval = F}
-drake::loadd(landing_model)
-drake::loadd(vessel_model)
-
-landing_model[[1]] %>%
-  predict_overall_mean() %>%
-  posterior_summary()
-
-
-
-
-vessel_model %>%
-  posterior_samples(pars = "^Intercept") %>%
-  as.data.frame() %>%
-  tibble::as.tibble() %>%
-  dplyr::mutate(Estimate = plogis(Intercept)) %>%
-  ggplot(aes(x = Estimate, y = 0)) +
-  stat_halfeye() +
-  theme_minimal()
-
-landing_model[[2]] %>%
-  posterior_samples(pars = c("^Intercept", "sigma")) %>%
-  as.data.frame() %>%
-  tibble::as.tibble() %>%
-  dplyr::mutate(Estimate = exp(Intercept + (sigma)/2), m = mean(Estimate)) %>%
-  ggplot(aes(x = Estimate, y = 0)) +
-  stat_halfeye() +
-  theme_minimal()
-
-landing_model[[2]] %>%
-  posterior_predict(newdata = data.frame(dummy = 1), re_formula = NA) %>%
-  as.data.frame() %>%
-  tibble::as.tibble() %>%
-  dplyr::mutate(Estimate = V1, 
-                m = mean(Estimate)) %>%
-  ggplot(aes(x = Estimate, y = 0)) +
-  stat_halfeye() +
-  theme_minimal()
-
-predict_yearly <- function(model){
-  pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
-                                       to = as.Date("2020-08-31"),
-                                       by = 1)) %>%
-  dplyr::mutate(month = lubridate::month(date), 
-                week = lubridate::isoweek(date), 
-                wday = lubridate::wday(date, label = T))
-  
-  predict(model, pred_data, re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE) %>%
-    as.data.frame() %>%
-    dplyr::bind_cols(pred_data) 
-}
-
-plot_time_prediction <- function(x) {
+get_root_name <- function(x){
   x %>%
-    ggplot(aes(x = date, y = Estimate)) +
-    geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5), fill = "grey70") +
-    geom_line() +
-    theme_minimal()
+    stringr::str_extract("[a-z\b]+") %>%
+    stringr::str_sub(start = 1, end = -2)
 }
 
-predict_yearly(vessel_model) %>%
-  stat_dotsinterval()
-```
-
-
-```{r, eval = FALSE}
-library(brms)
-landing_model_data <- landing_trips %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(month = lubridate::month(date), 
-                week = lubridate::isoweek(date), 
-                wday = lubridate::wday(date, label = T), 
-                num_date = as.numeric(date), 
-                num_date = num_date - min(num_date)) %>%
-  dplyr::group_by(fisher, date) %>%
-  dplyr::slice(1)
-
-m0 <- brm(weight_kg ~ 1 + (1 | fisher) + (1 | wday) + (1 | month), 
-          data = landing_model_data, 
-          family = lognormal, 
-          iter = 4000, 
-          save_pars = save_pars(all = TRUE),
-          cores = 4)
-
-m2 <- brm(weight_kg ~ 1 + arma(time = num_date, gr = fisher, cov = TRUE) + (1 | fisher) + (1 | wday) + (1 | week), 
-          data = landing_model_data, 
-          family = lognormal, 
-          control = list(adapt_delta = 0.9),
-          save_pars = save_pars(all = TRUE),
-          iter = 4000, 
-          cores = 4)
-
-pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
-                                       to = as.Date("2020-08-31"),
-                                       by = 1)) %>%
-  dplyr::mutate(month = lubridate::month(date), 
-                week = lubridate::isoweek(date), 
-                wday = lubridate::wday(date, label = T))
-
-plot_time_prediction <- function(x) {
-  x %>%
-    ggplot(aes(x = date, y = Estimate)) +
-    geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5), fill = "grey70") +
-    geom_line() +
-    theme_minimal()
-}
-
-samples_to_df <- . %>%
-  set_colnames(as.character(pred_data$date)) %>%
-  as.data.frame.table() %>%
-  dplyr::mutate(date = as.Date(Var2)) %>%
-  dplyr::rename(Estimate = Freq, sample = Var1) %>%
-  dplyr::inner_join(pred_data, by = "date")
-
-m0_pred_summary <- predict(m0, pred_data, re_formula = ~ (1 | wday) + (1 | month), allow_new_levels = TRUE) %>%
-  as.data.frame() %>%
-  dplyr::bind_cols(pred_data) 
-
-m0_pred_samples <- predict(m0, pred_data, re_formula = ~ (1 | wday) + (1 | month),
-                           allow_new_levels = TRUE, summary = F) %>%
-  samples_to_df()
-
-m1_pred_summary <- predict(m1, pred_data, re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE) %>%
-  as.data.frame() %>%
-  dplyr::bind_cols(pred_data) 
-
-m1_pred_samples <- predict(m1, pred_data, re_formula = ~ (1 | wday) + (1 | week), allow_new_levels = TRUE, 
-                           summary = FALSE)  %>%
-  samples_to_df()
-
-
-m0_pred_samples %>%
-  dplyr::group_by(sample) %>%
-  dplyr::summarise(yearly_total = sum(Estimate)) %>%
-  dplyr::mutate(group = rep(c("A", "B"), each = 4000)) %>%
-  ggplot(aes(x = yearly_total, y = 1)) +
-  stat_dotsinterval()
-```
-
-
-## Landings
-
-
-
-
-```{r}
-```
-
-```{r, message=FALSE}
-trip_summary <- landings_clean %>%
-  dplyr::group_by(trip_id) %>%
-  dplyr::summarise(
-    date = dplyr::first(date), 
-    fisher = dplyr::first(fisher), 
-    total_price = sum(total_price), 
-    weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(common_malay))
-
-fisher_summary <- landings_clean %>%
-  dplyr::group_by(fisher) %>%
-  dplyr::summarise(
-    imei = dplyr::first(imei),
-    first_trip = min(date), 
-    last_trip = max(date),
-    n_trips = dplyr::n_distinct(trip_id),
-    total_price = sum(total_price), 
-    weight_kg = sum(weight_kg),
-    n_species = dplyr::n_distinct(common_malay)) %>%
-  dplyr::arrange(-n_trips)
-```
-
-Between `r format(min(trip_summary$date), "%d %B %Y")` and `r format(max(trip_summary$date), "%d %B %Y")` we recorded landings for `r nrow(trip_summary)` trips by `r dplyr::n_distinct(landings_clean$fisher)` fishers. 
-
-
-
-During this time, GPS trackers were installed in `r length(na.omit(fisher_summary$imei))` boats. 
-
-```{r}
-trip_summary %>%
-  ggplot(aes(x = date)) +
-  geom_histogram(binwidth = 14, boundary = as.Date("2020-01-01")) +
-  theme_minimal()
-```
-
-```{r}
-fisher_summary %>%
-  dplyr::mutate(fisher = forcats::fct_reorder(fisher, first_trip, .desc = TRUE)) %>%
-  ggplot(aes(y = fisher)) +
-  geom_segment(aes(x = first_trip, 
-                   xend = last_trip, yend = fisher, colour = is.na(imei))) +
-  geom_point(data = trip_summary, 
-             aes(x = date), size = 1, shape = 3) +
-  theme_minimal()
-```
-
-```{r}
 species_summary <- landings_clean %>%
   dplyr::filter(!is.na(price_kg)) %>%
-  dplyr::mutate(species = forcats::fct_lump_n(common_malay, w = price_kg*weight_kg, n = 20)) %>%
-  dplyr::group_by(species) %>%
+  dplyr::mutate(species = get_root_name(common_malay), 
+                price = weight_kg * price_kg) %>%
+  dplyr::group_by(species, common_malay) %>%
   dplyr::summarise(
     frequency = dplyr::n_distinct(trip_id), 
     weight = sum(weight_kg, na.rm = TRUE), 
-    price_kg = mean(price_kg, na.rm = TRUE)) %>%
-  dplyr::mutate(species = forcats::fct_reorder(species, price_kg*weight), 
-                species = forcats::fct_relevel(species, "Other"))
+    price_kg = mean(price_kg, na.rm = TRUE), 
+    price = sum(price)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(species_p = forcats::fct_lump_prop(species, 
+                                              w = price,
+                                              prop = 0.02, 
+                                              other_level = NA),
+                species_w = forcats::fct_lump_prop(species, 
+                                                   w = weight,
+                                                   prop = 0.02, 
+                                                   other_level = NA)) %>%
+  dplyr::mutate(dplyr::across(dplyr::starts_with("species"), as.character),
+                species = dplyr::coalesce(species_w, species_p), 
+                species = tidyr::replace_na(species, "Other"), 
+                dplyr::across(tidyselect:::where(is.numeric), ~ . / sum(.))) 
 
-species_summary %>%
-  ggplot(aes(x = species, y = price_kg*weight)) +
-  geom_col() +
-  coord_flip()
+p1 <- species_summary %>%
+  dplyr::mutate(dplyr::across(c("species", "common_malay"), 
+                              ~ forcats::fct_reorder(., price, sum)), 
+                species_p = forcats::fct_reorder(species_p, price, sum, .desc = T),
+                focal = as.numeric(species_p) <= 3,
+                focal = tidyr::replace_na(focal, FALSE),
+                species = forcats::fct_relevel(species, "Other")) %>%
+  ggplot(aes(x = species, y = price)) +
+  geom_col(aes(fill = focal), alpha = 0.7) +
+  # geom_text(aes(label = scales::percent(price, accuracy = 1))) +
+  coord_flip() +
+  theme_minimal() +
+  scale_y_continuous(expand = expansion(mult = c(0,0)), 
+                     labels = scales::label_percent()) +
+  scale_fill_manual(values = c("grey70", "grey30"))+
+  theme(legend.position = "none", axis.title = element_blank(), 
+        plot.margin = unit(c(1,4,1,0), units = "mm"), 
+        plot.subtitle = element_text(hjust = 0.5), 
+        axis.text.y = element_text(hjust = 0.5), 
+        panel.grid.major.y = element_blank(), 
+        plot.background = element_blank()) +
+  labs(subtitle = "Income", 
+       caption = "* Species that accounted for less than 1% of the total catch or weight were grouped together")
 
-species_summary %>%
-  ggplot(aes(x = species, y = price_kg)) +
-  geom_col() +
-  coord_flip()
-
-species_summary %>%
+p2  <- species_summary %>%
+  dplyr::mutate(dplyr::across(c("species", "common_malay"), 
+                              ~ forcats::fct_reorder(., weight, sum)),
+                species_p = forcats::fct_reorder(species_p, price, sum, .desc = T),
+                focal = as.numeric(species_p) <= 3,
+                focal = tidyr::replace_na(focal, FALSE),
+                  species = forcats::fct_relevel(species, "Other")) %>%
   ggplot(aes(x = species, y = weight)) +
-  geom_col() +
-  coord_flip()
+  geom_col(aes(group = common_malay, fill = focal), alpha = 0.7) +
+  coord_flip()+
+  scale_y_reverse(expand = expansion(mult = 0), 
+                     labels = scales::label_percent()) +
+  scale_x_discrete(position = "top") +
+  scale_fill_manual(values = c("grey70", "grey30"))+
+  theme_minimal() +
+  theme(legend.position = "none", axis.title = element_blank(), 
+        plot.margin = unit(c(1,0,1, 4), units = "mm"), 
+        axis.text.y.right = element_text(hjust = 0.5), 
+        plot.subtitle = element_text(hjust = 0.5), 
+        panel.grid.major.y = element_blank(), 
+        plot.background = element_blank()) +
+  labs(subtitle = "Weight")
+
+plink <- species_summary %>%
+  dplyr::mutate(species_p = forcats::fct_reorder(species, price, sum),
+                species_w = forcats::fct_reorder(species, weight, sum), 
+                species_p2 = forcats::fct_reorder(species_p, price, sum, 
+                                                  .desc = T),
+                focal = as.numeric(species_p2) <= 3,
+                focal = tidyr::replace_na(focal, FALSE),
+                dplyr::across(dplyr::starts_with("species"), 
+                              ~ forcats::fct_relevel(., "Other")), 
+                dplyr::across(dplyr::starts_with("species"), 
+                              as.numeric)) %>% 
+  dplyr::distinct(species_p, species_w, focal) %>%
+  ggplot(aes(colour = focal)) +
+  geom_diagonal(aes(x = 1, xend = 2, y = species_w, yend = species_p), strength = 0.5, alpha = 0.7) +
+  geom_point(aes(x = 1, y = species_w), alpha = 0.7) +
+  geom_point(aes(x = 2, y = species_p), alpha = 0.7) +
+  scale_color_manual(values = c("grey70", "grey30"))+
+  theme_no_axes(theme_minimal())+
+  theme(legend.position = "none", axis.title = element_blank(), 
+        plot.margin = unit(c(1,0,1, 0), units = "mm"), 
+        plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Contribution of different species to reported landings")
+  
+
+cowplot::plot_grid(p2, plink, p1, 
+                   nrow = 1, align ="h", rel_widths = c(1,0.33, 1))
 ```
 
-```{r}
-trip_summary %>%
-  ggplot(aes(x = date, y = weight_kg)) +
-  geom_point(aes(colour = fisher))
+## Other unfinished plots
 
-trip_summary %>%
-  ggplot(aes(x = date, y = total_price)) +
-  geom_point(aes(colour = fisher))
-```
-
+(not to be included in final document)
 
 ```{r}
 predict_fisher_differences <- function(model){
@@ -600,3 +491,60 @@ models %>%
   facet_wrap("model", scales = "free_x")
 ```
 
+
+```{r, message=FALSE}
+trip_summary <- landings_clean %>%
+  dplyr::group_by(trip_id) %>%
+  dplyr::summarise(
+    date = dplyr::first(date), 
+    fisher = dplyr::first(fisher), 
+    total_price = sum(total_price), 
+    weight_kg = sum(weight_kg),
+    n_species = dplyr::n_distinct(common_malay))
+
+fisher_summary <- landings_clean %>%
+  dplyr::group_by(fisher) %>%
+  dplyr::summarise(
+    imei = dplyr::first(imei),
+    first_trip = min(date), 
+    last_trip = max(date),
+    n_trips = dplyr::n_distinct(trip_id),
+    total_price = sum(total_price), 
+    weight_kg = sum(weight_kg),
+    n_species = dplyr::n_distinct(common_malay)) %>%
+  dplyr::arrange(-n_trips)
+```
+
+
+```{r}
+trip_summary %>%
+  ggplot(aes(x = date)) +
+  geom_histogram(binwidth = 14, boundary = as.Date("2020-01-01")) +
+  theme_minimal()
+```
+
+```{r}
+fisher_summary %>%
+  dplyr::mutate(fisher = forcats::fct_reorder(fisher, first_trip, .desc = TRUE)) %>%
+  ggplot(aes(y = fisher)) +
+  geom_segment(aes(x = first_trip, 
+                   xend = last_trip, yend = fisher, colour = is.na(imei))) +
+  geom_point(data = trip_summary, 
+             aes(x = date), size = 1, shape = 3) +
+  theme_minimal()
+```
+Between `r format(min(trip_summary$date), "%d %B %Y")` and `r format(max(trip_summary$date), "%d %B %Y")` we recorded landings for `r nrow(trip_summary)` trips by `r dplyr::n_distinct(landings_clean$fisher)` fishers. 
+
+
+
+During this time, GPS trackers were installed in `r length(na.omit(fisher_summary$imei))` boats. 
+
+```{r}
+trip_summary %>%
+  ggplot(aes(x = date, y = weight_kg)) +
+  geom_point(aes(colour = fisher))
+
+trip_summary %>%
+  ggplot(aes(x = date, y = total_price)) +
+  geom_point(aes(colour = fisher))
+```
