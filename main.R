@@ -40,11 +40,11 @@ get_data <- drake_plan(
 )
 
 clean_data <- drake_plan(
-  landings_clean = clean_landings(landings, report_dates),
+  landings_clean = clean_landings(landings),
   species_clean = clean_species(species),
   points = clean_points(file_in("data/raw/points.csv")),
   boats = clean_boats(file_in("data/raw/boats.csv")),
-  trips = process_trips(landings_clean, points, boats),
+  trips = process_trips(landings_clean, points, boats, report_dates),
 )
 
 modeling <- drake_plan(

@@ -1,5 +1,5 @@
 # Clean the landings data frame
-clean_landings <- function(landings, report_dates = NULL){
+clean_landings <- function(landings){
   landings_clean <- landings %>%
     dplyr::select(-rec_id, -common_eng) %>%
     dplyr::mutate(date = as.Date(date, tz = "Asia/Kuala_Lumpur")) %>%
@@ -9,15 +9,9 @@ clean_landings <- function(landings, report_dates = NULL){
                     true = NA_integer_,
                     false = imei),
                   imei = as.character(imei)) %>%
-    dplyr::mutate(common_malay = tolower(common_malay)) %>%
+    dplyr::mutate(reported_name = tolower(common_malay)) %>%
     dplyr::rename(weight_kg = kg,
                   total_price = total_revenue)
-
-  if(!is.null(report_dates)){
-    landings_clean %>%
-      dplyr::filter(date >= report_dates[1],
-                    date <= report_dates[2])
-  }
 
   landings_clean
 }
@@ -25,19 +19,13 @@ clean_landings <- function(landings, report_dates = NULL){
 # Clean the species data frame
 clean_species <- function(species){
   species %>%
-    dplyr::mutate(common_malay = tolower(common_malay))
+    dplyr::mutate(reported_name = tolower(reported_name))
 }
 
-clean_points <- function(path, report_dates = NULL){
+clean_points <- function(path){
   points_clean <- path %>%
     readr::read_csv() %>%
     janitor::clean_names()
-
-  if(!is.null(report_dates)){
-    points_clean %<>%
-      dplyr::filter(date >= report_dates[1],
-                    dare <= report_dates[2])
-  }
 
   points_clean
 }
@@ -50,7 +38,7 @@ clean_boats <- function(path){
     dplyr::mutate_if(is.character, ~ dplyr::if_else(. == "--", NA_character_, .))
 }
 
-process_trips <- function(landings_clean, points, boats){
+process_trips <- function(landings_clean, points, boats, report_dates = NULL){
   landings_trips <- landings_clean %>%
     dplyr::group_by(trip_id) %>%
     dplyr::summarise(date = dplyr::first(date),
@@ -86,7 +74,7 @@ process_trips <- function(landings_clean, points, boats){
     dplyr::mutate(date = lubridate::as_date(time_end)) %>%
     dplyr::rename(trip_id_track = trip)
 
-  one_landing_per_day %>%
+  these_trips <- one_landing_per_day %>%
     dplyr::full_join(point_trips) %>%
     dplyr::bind_rows(remaining_landings) %>%
     dplyr::arrange(date) %>%
@@ -97,6 +85,12 @@ process_trips <- function(landings_clean, points, boats){
     dplyr::group_by(imei_short) %>%
     dplyr::mutate(fisher = dplyr::if_else(!is.na(imei_short), dplyr::first(na.omit(fisher)), fisher),
                   fisher = dplyr::if_else(is.na(fisher), boat_name, fisher))
+
+  if(!is.null(report_dates)){
+    these_trips %<>%
+      dplyr::filter(date >= report_dates[1],
+                    date <= report_dates[2])
+  }
 
   # points %>%
   #   dplyr::mutate(time = lubridate::with_tz(time, tzone = "Asia/Kuala_Lumpur"),
