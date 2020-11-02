@@ -11,10 +11,7 @@ clean_landings <- function(landings, report_dates = NULL){
                   imei = as.character(imei)) %>%
     dplyr::mutate(common_malay = tolower(common_malay)) %>%
     dplyr::rename(weight_kg = kg,
-                  total_price = total_revenue) %>%
-    # put together catches from a single day
-    dplyr::group_by(fisher, date) %>%
-    dplyr::mutate(trip_id = dplyr::first(trip_id))
+                  total_price = total_revenue)
 
   if(!is.null(report_dates)){
     landings_clean %>%
