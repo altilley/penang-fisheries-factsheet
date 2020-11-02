@@ -59,15 +59,22 @@ process_trips <- function(landings_clean, points, boats){
                      weight_kg = sum(weight_kg, na.rm = TRUE),
                      total_price = sum(total_price, na.rm = TRUE)) %>%
     dplyr::rename(trip_id_landing = trip_id) %>%
-    dplyr::mutate(imei_short = stringr::str_sub(imei, -7)) %>%
+    dplyr::mutate(imei_short = stringr::str_sub(imei, -7))
+
+  one_landing_per_day <- landings_trips %>%
     # select largest catch of the day only
     dplyr::group_by(fisher, date) %>%
-    dplyr::filter(weight_kg == max(weight_kg))
+    dplyr::filter(weight_kg == max(weight_kg)) %>%
+    dplyr::ungroup()
+
+  remaining_landings <- landings_trips %>%
+    dplyr::group_by(fisher, date) %>%
+    dplyr::filter(weight_kg != max(weight_kg)) %>%
+    dplyr::ungroup()
 
   boat_info <- boats %>%
     dplyr::mutate(imei_short = stringr::str_sub(imei_long, -7)) %>%
     dplyr::select(boat, imei_short)
-
 
   point_trips <- points %>%
     # dplyr::mutate(time = lubridate::with_tz(time, tzone = "Asia/Kuala_Lumpur")) %>%
@@ -79,8 +86,9 @@ process_trips <- function(landings_clean, points, boats){
     dplyr::mutate(date = lubridate::as_date(time_end)) %>%
     dplyr::rename(trip_id_track = trip)
 
-  landings_trips %>%
+  one_landing_per_day %>%
     dplyr::full_join(point_trips) %>%
+    dplyr::bind_rows(remaining_landings) %>%
     dplyr::arrange(date) %>%
     dplyr::mutate(trip_id = 1:dplyr::n()) %>%
     dplyr::group_by(fisher) %>%
