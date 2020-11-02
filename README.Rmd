@@ -25,6 +25,7 @@ drake::loadd(points)
 drake::loadd(landings_clean)
 drake::loadd(landing_model)
 drake::loadd(vessel_model)
+drake::loadd(species_clean)
 
 trips <- trips %>%
   dplyr::filter(date < as.Date("2020-09-01"))
@@ -333,7 +334,8 @@ get_root_name <- function(x){
 
 species_summary <- landings_clean %>%
   dplyr::filter(!is.na(price_kg)) %>%
-  dplyr::mutate(species = get_root_name(common_malay), 
+  dplyr::left_join(species_clean) %>%
+  dplyr::mutate(species = malay_common_name, 
                 price = weight_kg * price_kg) %>%
   dplyr::group_by(species, common_malay) %>%
   dplyr::summarise(
@@ -369,9 +371,9 @@ p1 <- species_summary %>%
   theme_minimal() +
   scale_y_continuous(expand = expansion(mult = c(0,0)), 
                      labels = scales::label_percent()) +
-  scale_fill_manual(values = c("grey70", "grey30"))+
+  scale_fill_manual(values = c("grey70", "#1a4985"))+
   theme(legend.position = "none", axis.title = element_blank(), 
-        plot.margin = unit(c(1,4,1,0), units = "mm"), 
+        # plot.margin = unit(c(1,4,1,0), units = "mm"), 
         plot.subtitle = element_text(hjust = 0.5), 
         axis.text.y = element_text(hjust = 0.5), 
         panel.grid.major.y = element_blank(), 
@@ -394,10 +396,10 @@ p2  <- species_summary %>%
   scale_y_reverse(expand = expansion(mult = 0), 
                      labels = scales::label_percent()) +
   scale_x_discrete(position = "top") +
-  scale_fill_manual(values = c("grey70", "grey30"))+
+  scale_fill_manual(values = c("grey70", "#1a4985"))+
   theme_minimal() +
   theme(legend.position = "none", axis.title = element_blank(), 
-        plot.margin = unit(c(1,0,1, 4), units = "mm"), 
+        # plot.margin = unit(c(1,0,1, 4), units = "mm"), 
         axis.text.y.right = element_text(hjust = 0.5), 
         plot.subtitle = element_text(hjust = 0.5), 
         panel.grid.major.y = element_blank(), 
@@ -422,10 +424,10 @@ plink <- species_summary %>%
   geom_diagonal(aes(x = 1, xend = 2, y = species_w, yend = species_p), strength = 0.5, alpha = 0.7) +
   geom_point(aes(x = 1, y = species_w), alpha = 0.7) +
   geom_point(aes(x = 2, y = species_p), alpha = 0.7) +
-  scale_color_manual(values = c("grey70", "grey30"))+
+  scale_color_manual(values = c("grey70", "#1a4985"))+
   theme_no_axes(theme_minimal())+
   theme(legend.position = "none", axis.title = element_blank(), 
-        plot.margin = unit(c(1,0,1, 0), units = "mm"), 
+        plot.margin = unit(c(1,0,1, 0), units = "mm"),
         text = element_text(family = "RobotoC"), 
         plot.title = element_text(hjust = 0.5, face = "bold")) +
   labs(title = toupper("Contribution of different species to reported landings"))
