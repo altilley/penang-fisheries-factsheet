@@ -2,7 +2,7 @@ Penang fisheries
 ================
 
 We report data collected between 01 September 2019 and 31 August 2020.
-During this year we recorded information about 713 fishing trips in
+During this year we recorded information about 724 fishing trips in
 Penang. The information about these trips was contributed by a total of
 46 local fishers and is a combination of tracking and landings.
 
@@ -17,13 +17,13 @@ these units tracked a total of 645 trips.
 In addition to the tracking data, we also collected landings data. Data
 collection was performed informally through a WhatsApp group set up with
 participating fishers. In total, we collected landings information for
-166 trips by 35 fishers.
+177 trips by 35 fishers.
 
 Three of the fishers that contributed landings data also had a tracker
 installed on their boats. Consequently we have both tracking and landing
 data for 98 trips. Most of the landing data, however, comes from the
 single most active fisher in the group. This fisher alone contributed
-landing data for 87 trips which corresponds to about 60% of all their
+landing data for 95 trips which corresponds to about 62% of all their
 fishing trips over the reporting period.
 
 ![](README_files/figure-gfm/tracks-figure-1.png)<!-- -->
@@ -52,24 +52,24 @@ involved in the calculation.
 
 First, we look at the expected catch weight from a single trip. There
 was a lot of variability in the catch weight with some trips fishing as
-little as 0.6kg and some as much as 200kg. Nevertheless, using ten
+little as 0.4kg and some as much as 200kg. Nevertheless, using ten
 thousand Monte Carlo simulations in our Bayesian models, we found that
-the average catch was very likely between 7.7kg and 17kg (90% credible
-intervals, mean 11.8kg). The average catch showed important differences
+the average catch was very likely between 10kg and 23.7kg (90% credible
+intervals, mean 15.9kg). The average catch showed important differences
 among fishers, with some consistently landing more catch by weight than
 the average. More data from a larger number of fishers will allow us to
 better understand what drives these differences.
 
 Second, we look at the expected income obtained from a fishing trip. We
 found that each fishing trip was very likely to provide an income
-between RM154 and RM326 (mean RM228) to artisanal fishers. Similar as
+between RM174 and RM443 (mean RM288) to artisanal fishers. Similar as
 the catch weight, average income levels showed a large variation. Some
-trips provided only RM5 as income for the fishers while some trips
+trips provided only RM0 as income for the fishers while some trips
 provided as much as RM1884.
 
 Third, we investigate the vessel activity coefficient during the study
 period. We found that this coefficient was very likely to be between
-0.33 and 0.51 (mean 0.42). Mathematically, this coefficient can be
+0.36 and 0.54 (mean 0.45). Mathematically, this coefficient can be
 interpreted in two (equivalent) ways. When applied to a single boat, it
 can be interpreted as the probability that this boat would to a fishing
 trip in a given day. When applied to a group of boats, for example the
@@ -89,9 +89,9 @@ in all estimates we present.
 
 Using all these pieces of information we estimate that between the
 period 01 September 2019 and 31 August 2020 **artisanal fishers were
-very likely (90% probability) to catch between 2 and 4.7 thousand tonnes
-in Penang waters, which provided income between RM39 and RM89 million to
-the local communities**.
+very likely (90% probability) to catch between 2.9 and 7.3 thousand
+tonnes in Penang waters, which provided income between RM49 and RM135
+million to the local communities**.
 
 ![](README_files/figure-gfm/annual-figure-1.png)<!-- -->
 
@@ -127,7 +127,7 @@ sufficient quality*.
 ![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- --> Between 01
-September 2019 and 19 September 2020 we recorded landings for 175 trips
+September 2019 and 19 September 2020 we recorded landings for 187 trips
 by 35 fishers.
 
 During this time, GPS trackers were installed in 3 boats.
