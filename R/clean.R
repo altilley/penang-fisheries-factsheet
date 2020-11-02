@@ -59,7 +59,10 @@ process_trips <- function(landings_clean, points, boats){
                      weight_kg = sum(weight_kg, na.rm = TRUE),
                      total_price = sum(total_price, na.rm = TRUE)) %>%
     dplyr::rename(trip_id_landing = trip_id) %>%
-    dplyr::mutate(imei_short = stringr::str_sub(imei, -7))
+    dplyr::mutate(imei_short = stringr::str_sub(imei, -7)) %>%
+    # select largest catch of the day only
+    dplyr::group_by(fisher, date) %>%
+    dplyr::filter(weight_kg == max(weight_kg))
 
   boat_info <- boats %>%
     dplyr::mutate(imei_short = stringr::str_sub(imei_long, -7)) %>%
