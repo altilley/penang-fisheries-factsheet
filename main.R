@@ -25,11 +25,11 @@ googleCloudStorageR::gcs_auth(json_file = "auth/penang-catch-auth.json")
 # Plan analysis ------------------------------------------------------------
 
 get_data <- drake_plan(
-  data_download = target(
-    command = googleCloudStorageR::gcs_get_object(
-      object_name = raw_data_object_uri,
-      saveToDisk = file_out("data/raw/penang-fisheries-landings.xlsx"),
-      overwrite = TRUE)),
+  # data_download = target(
+    # command = googleCloudStorageR::gcs_get_object(
+    #   object_name = raw_data_object_uri,
+    #   saveToDisk = file_out("data/raw/penang-fisheries-landings.xlsx"),
+    #   overwrite = TRUE)),
   landings = readxl::read_excel(
     path = file_in("data/raw/penang-fisheries-landings.xlsx"),
     sheet = "catch"),
