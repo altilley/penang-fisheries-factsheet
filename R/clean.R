@@ -71,7 +71,7 @@ process_trips <- function(landings_clean, points, boats, report_dates = NULL){
                      time_end = max(time),
                      boat_name = dplyr::first(boat_name)) %>%
     dplyr::left_join(boat_info, by = c("boat_name" = "boat")) %>%
-    dplyr::mutate(date = lubridate::as_date(time_end)) %>%
+    dplyr::mutate(date = lubridate::as_date(time_start)) %>%
     dplyr::rename(trip_id_track = trip)
 
   these_trips <- one_landing_per_day %>%
