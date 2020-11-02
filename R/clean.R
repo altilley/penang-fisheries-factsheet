@@ -65,7 +65,7 @@ process_trips <- function(landings_clean, points, boats, report_dates = NULL){
     dplyr::select(boat, imei_short)
 
   point_trips <- points %>%
-    # dplyr::mutate(time = lubridate::with_tz(time, tzone = "Asia/Kuala_Lumpur")) %>%
+    dplyr::mutate(time = lubridate::with_tz(time, tzone = "Asia/Kuala_Lumpur")) %>%
     dplyr::group_by(trip) %>%
     dplyr::summarise(time_start = min(time),
                      time_end = max(time),
