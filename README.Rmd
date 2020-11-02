@@ -76,8 +76,8 @@ points %>%
   ggplot(aes(x = lng, y = lat, group = trip, colour = !is.na(trip_id_landing))) +
   geom_path(size = 0.3, alpha = 0.5) +
   guides(colour = guide_legend()) +
-  scale_color_manual(values = c("grey70", "grey30"), 
-                     # values = c("grey70", "#1a4985"), 
+  scale_color_manual(#values = c("grey70", "grey30"), 
+                     values = c("grey70", "#1a4985"),
                      labels = c("trips without landing data", "trips with landing data")) +
   coord_quickmap() +
   theme_minimal() +
