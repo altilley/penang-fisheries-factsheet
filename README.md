@@ -7,11 +7,11 @@ trips in Penang. The information about these trips was contributed by a
 total of 53 local fishers and is a combination of tracking and landings.
 
 Up to 31 August 2021, WorldFish installed solar-powered GPS trackers
-sourced from Pelagic Data Systems Inc. in 21 boats at four key landing
-sites of Teluk Bahang, Balik Pulau, Seagate and Kuala Binjai. Most of
+sourced from Pelagic Data Systems Inc. in 24 boats at six key landing
+sites of Teluk Bahang, Balik Pulau, Seagate, Kampung Binjai, Kuala Mudah and Sungai Batu. Most of
 the trackers were installed in July or August 2020, but three of them
 were installed in September or November 2019 which allow us to get a
-better picture of their activity across the year. Until 31 August 2021
+better picture of their activity across 2020. Until 31 August 2021
 these units tracked a total of 2671 trips.
 
 In addition to the tracking data, we also collected landings data. Data
