@@ -36,7 +36,7 @@ get_data <- drake_plan(
   species = readxl::read_excel(
     path = file_in("data/raw/penang-fisheries-landings.xlsx"),
     sheet = "species"),
-  report_dates = c(as.Date("2019-09-01"), as.Date("2020-08-31")),
+  report_dates = c(as.Date("2019-09-01"), as.Date("2021-08-31")),
 )
 
 clean_data <- drake_plan(

@@ -28,7 +28,7 @@ drake::loadd(vessel_model)
 drake::loadd(species_clean)
 
 trips <- trips %>%
-  dplyr::filter(date < as.Date("2020-09-01"))
+  dplyr::filter(date < as.Date("2021-09-01"))
 ```
 
 ```{r trip-stats}
@@ -49,7 +49,7 @@ main_contributor <- trips %>%
 ```
 
 We report data collected between `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")`. 
-During this year we recorded information about `r nrow(trips)` fishing trips in Penang. 
+Overall, during these years we recorded information about `r nrow(trips)` fishing trips in Penang. 
 The information about these trips was contributed by a total of `r dplyr::n_distinct(trips$fisher)` local fishers and is a combination of tracking and landings. 
 
 Up to `r format(max(trips$date), "%d %B %Y")`, WorldFish installed solar-powered GPS trackers sourced from Pelagic Data Systems Inc. in `r dplyr::n_distinct(points$boat_name)` boats at four key landing sites of Teluk Bahang, Balik Pulau, Seagate and Kuala Binjai.
@@ -59,6 +59,7 @@ Until `r format(max(trips$date), "%d %B %Y")` these units tracked a total of `r 
 In addition to the tracking data, we also collected landings data. 
 Data collection was performed informally through a WhatsApp group set up with participating fishers. 
 In total, we collected landings information for `r nrow(landing_trips)` trips by `r dplyr::n_distinct(landing_trips$fisher)` fishers. 
+Landings data is available between `r format(min(landing_trips$date), "%d %B %Y")` and `r format(max(landing_trips$date), "%d %B %Y")`.
 
 Three of the fishers that contributed landings data also had a tracker installed on their boats. 
 Consequently we have both tracking and landing data for `r nrow(full_info_trips)` trips.
@@ -67,7 +68,7 @@ This fisher alone contributed landing data for `r max(landing_fisher_tabyl$n)` t
 
 ```{r tracks-figure, fig.height=10}
 points %>%
-  dplyr::filter(time < lubridate::ymd("2020-09-01")) %>%
+  dplyr::filter(time < lubridate::ymd("2021-09-01")) %>%
   dplyr::left_join(trips, by = c("trip" = "trip_id_track")) %>% 
   dplyr::group_by(trip) %>%
   dplyr::slice_sample(prop = 0.1) %>%
@@ -91,7 +92,7 @@ points %>%
         text = element_text(family = "RobotoC"), 
         plot.title = element_text(face = "bold")) +
   labs(title = paste("A VISUAL SAMPLE OF", nrow(tracking_trips), "FISHING TRIPS IN PENANG"), 
-       caption = "* Trips recorded between 01 September 2019 and 31 August 2020", 
+       caption = "* Trips recorded between 01 September 2019 and 31 August 2021", 
        x = "Longitude", y = "Latitude")
 ```
 
@@ -133,7 +134,7 @@ est_sum <- models %>%
 
 First, we look at the expected catch weight from a single trip. 
 There was a lot of variability in the catch weight with some trips fishing as little as `r round(min(landing_trips$weight_kg), 1)`kg and some as much as `r round(max(landing_trips$weight_kg), 0)`kg. 
-Nevertheless, using ten thousand Monte Carlo simulations in our Bayesian models, we found that the average catch was very likely between `r round(est_sum$catch$Q5, 1)`kg and `r round(est_sum$catch$Q95, 1)`kg (90% credible intervals, mean `r round(est_sum$catch$Estimate, 1)`kg).
+Nevertheless, using ten thousand Monte Carlo simulations in our Bayesian models, we found that the average catch was very likely between `r round(est_sum$catch$Q5, 0)`kg and `r round(est_sum$catch$Q95, 0)`kg (90% credible intervals, mean `r round(est_sum$catch$Estimate, 1)`kg).
 The average catch showed important differences among fishers, with some consistently landing more catch by weight than the average. 
 More data from a larger number of fishers will allow us to better understand what drives these differences. 
 
@@ -155,10 +156,20 @@ In 2018 there were 1,658 fishers registered.
 This number might differ from the number of fishers during the reporting period, but we expect the updated number to be within 50 fishers from the 2018 number. 
 We incorporate this uncertainty in all estimates we present.
 
+```{r estimates-period}
+estimates_period <- list(
+  min = as.Date("2019-09-01"), 
+  max = as.Date("2020-08-31")
+)
+```
+
+
+Because we only have landings information up until `r format(max(landing_trips$date), "%d %B %Y")`, we present estimates for only the first year of our reporting period between `r format(estimates_period$min, "%d %B %Y")` and `r format(estimates_period$max, "%d %B %Y")`.
+
 ```{r yearly-estimates}
 predict_yearly_error <- function(model){
-  pred_data <- tibble::tibble(date = seq(from = as.Date("2019-09-01"), 
-                                       to = as.Date("2020-08-31"),
+  pred_data <- tibble::tibble(date = seq(from = estimates_period$min, 
+                                       to = estimates_period$max,
                                        by = 1)) %>%
   dplyr::mutate(month = lubridate::month(date), 
                 week = lubridate::isoweek(date), 
@@ -204,7 +215,7 @@ ann_sum <- annual_totals %>%
   purrr::array_tree()
 ```
 
-Using all these pieces of information we estimate that between the period `r format(min(trips$date), "%d %B %Y")` and `r format(max(trips$date), "%d %B %Y")` **artisanal fishers were very likely (90% probability) to catch between `r round(ann_sum$catch$Q5/1000000, 1)` and `r round(ann_sum$catch$Q95/1000000, 1)` thousand tonnes in Penang waters, which provided income between RM`r round(ann_sum$income$Q5/1000000, 0)` and RM`r round(ann_sum$income$Q95/1000000, 0)` million to the local communities**. 
+Using all these pieces of information we estimate that between the period `r format(estimates_period$min, "%d %B %Y")` and `r format(estimates_period$max, "%d %B %Y")` **artisanal fishers were very likely (90% probability) to catch between `r round(ann_sum$catch$Q5/1000000, 1)` and `r round(ann_sum$catch$Q95/1000000, 1)` thousand tonnes in Penang waters, which provided income between RM`r round(ann_sum$income$Q5/1000000, 0)` and RM`r round(ann_sum$income$Q95/1000000, 0)` million to the local communities**. 
 
 ```{r annual-figure, fig.height=5}
 

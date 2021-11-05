@@ -1,29 +1,30 @@
 Penang fisheries
 ================
 
-We report data collected between 01 September 2019 and 31 August 2020.
-During this year we recorded information about 724 fishing trips in
-Penang. The information about these trips was contributed by a total of
-46 local fishers and is a combination of tracking and landings.
+We report data collected between 01 September 2019 and 31 August 2021.
+Overall, during these years we recorded information about 2751 fishing
+trips in Penang. The information about these trips was contributed by a
+total of 53 local fishers and is a combination of tracking and landings.
 
-Up to 31 August 2020, WorldFish installed solar-powered GPS trackers
-sourced from Pelagic Data Systems Inc. in 14 boats at four key landing
+Up to 31 August 2021, WorldFish installed solar-powered GPS trackers
+sourced from Pelagic Data Systems Inc. in 21 boats at four key landing
 sites of Teluk Bahang, Balik Pulau, Seagate and Kuala Binjai. Most of
 the trackers were installed in July or August 2020, but three of them
 were installed in September or November 2019 which allow us to get a
-better picture of their activity across the year. Until 31 August 2020
-these units tracked a total of 645 trips.
+better picture of their activity across the year. Until 31 August 2021
+these units tracked a total of 2671 trips.
 
 In addition to the tracking data, we also collected landings data. Data
 collection was performed informally through a WhatsApp group set up with
 participating fishers. In total, we collected landings information for
-177 trips by 35 fishers.
+188 trips by 35 fishers. Landings data is available between 01 September
+2019 and 19 September 2020.
 
 Three of the fishers that contributed landings data also had a tracker
 installed on their boats. Consequently we have both tracking and landing
-data for 98 trips. Most of the landing data, however, comes from the
+data for 108 trips. Most of the landing data, however, comes from the
 single most active fisher in the group. This fisher alone contributed
-landing data for 95 trips which corresponds to about 62% of all their
+landing data for 106 trips which corresponds to about 32% of all their
 fishing trips over the reporting period.
 
 ![](README_files/figure-gfm/tracks-figure-1.png)<!-- -->
@@ -54,22 +55,22 @@ First, we look at the expected catch weight from a single trip. There
 was a lot of variability in the catch weight with some trips fishing as
 little as 0.4kg and some as much as 200kg. Nevertheless, using ten
 thousand Monte Carlo simulations in our Bayesian models, we found that
-the average catch was very likely between 10kg and 23.7kg (90% credible
-intervals, mean 15.9kg). The average catch showed important differences
+the average catch was very likely between 10kg and 23kg (90% credible
+intervals, mean 15.7kg). The average catch showed important differences
 among fishers, with some consistently landing more catch by weight than
 the average. More data from a larger number of fishers will allow us to
 better understand what drives these differences.
 
 Second, we look at the expected income obtained from a fishing trip. We
 found that each fishing trip was very likely to provide an income
-between RM174 and RM443 (mean RM288) to artisanal fishers. Similar as
+between RM170 and RM430 (mean RM283) to artisanal fishers. Similar as
 the catch weight, average income levels showed a large variation. Some
 trips provided only RM0 as income for the fishers while some trips
-provided as much as RM1884.
+provided as much as RM2013.
 
 Third, we investigate the vessel activity coefficient during the study
 period. We found that this coefficient was very likely to be between
-0.36 and 0.54 (mean 0.45). Mathematically, this coefficient can be
+0.28 and 0.44 (mean 0.36). Mathematically, this coefficient can be
 interpreted in two (equivalent) ways. When applied to a single boat, it
 can be interpreted as the probability that this boat would to a fishing
 trip in a given day. When applied to a group of boats, for example the
@@ -87,10 +88,14 @@ during the reporting period, but we expect the updated number to be
 within 50 fishers from the 2018 number. We incorporate this uncertainty
 in all estimates we present.
 
+Because we only have landings information up until 19 September 2020, we
+present estimates for only the first year of our reporting period
+between 01 September 2019 and 31 August 2020.
+
 Using all these pieces of information we estimate that between the
 period 01 September 2019 and 31 August 2020 **artisanal fishers were
-very likely (90% probability) to catch between 2.9 and 7.3 thousand
-tonnes in Penang waters, which provided income between RM49 and RM135
+very likely (90% probability) to catch between 2.3 and 5.7 thousand
+tonnes in Penang waters, which provided income between RM40 and RM106
 million to the local communities**.
 
 ![](README_files/figure-gfm/annual-figure-1.png)<!-- -->
