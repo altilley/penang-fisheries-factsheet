@@ -8,10 +8,10 @@ f <- lapply(list.files(path = here::here("R"), full.names = TRUE,
                        include.dirs = TRUE, pattern = "*.R"), source)
 
 # Variables
-raw_data_object_uri <- "gs://penang-catch/penang-fisheries-landings.xlsx"
+# raw_data_object_uri <- "gs://penang-catch/penang-fisheries-landings.xlsx"
 
 # Authenticate
-googleCloudStorageR::gcs_auth(json_file = "auth/penang-catch-auth.json")
+# googleCloudStorageR::gcs_auth(json_file = "auth/penang-catch-auth.json")
 # bigrquery::bq_auth(path = "auth/tracking-auth.json")
 # Tracks bigquery connection
 # con <- DBI::dbConnect(
