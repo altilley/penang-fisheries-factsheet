@@ -138,7 +138,7 @@ The average catch showed important differences among fishers, with some consiste
 More data from a larger number of fishers will allow us to better understand what drives these differences. 
 
 Second, we look at the expected income obtained from a fishing trip. 
-We found that each fishing trip was very likely to provide an income between RM`r round(est_sum$income$Q5)` and RM`r round(est_sum$income$Q95)` (mean RM`r round(est_sum$income$Estimate)`) to artisanal fishers. 
+We found that each fishing trip was very likely to provide an income between RM`r signif(est_sum$income$Q5, 2)` and RM`r signif(est_sum$income$Q95, 2)` (mean RM`r round(est_sum$income$Estimate)`) to artisanal fishers. 
 Similar as the catch weight, average income levels showed a large variation. 
 Some trips provided only RM`r round(min(landing_trips$total_price))` as income for the fishers while some trips provided as much as RM`r round(max(landing_trips$total_price))`. 
 
